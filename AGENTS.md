@@ -1,5 +1,7 @@
 # Repository-level Agent Guide
 
+Current durable continuity artifact: `AI_MEMORIES/2026-08-04-openai-responses-2234.md`.
+
 Reply in the same language as the user.
 
 This is a TypeScript monorepo built for agent-assisted development. Keep the root `AGENTS.md` limited to hot-path rules: the project map, hard constraints, and workflow requirements — things every task needs to know.

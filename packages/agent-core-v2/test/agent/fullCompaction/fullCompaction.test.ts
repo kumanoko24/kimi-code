@@ -29,6 +29,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DefaultCompactionStrategy,
 } from '#/agent/fullCompaction/strategy';
+import { OPENAI_RESPONSES_COMPACTION_FLAG_ENV } from '#/agent/fullCompaction/flag';
 import { COMPACTION_SUMMARY_PREFIX } from '#/agent/contextMemory/compactionHandoff';
 import { makeHookRunner } from '../externalHooks/runner-stub';
 import type { IExternalHooksRunnerService } from '#/app/externalHooksRunner/externalHooksRunner';
@@ -314,6 +315,67 @@ describe('FullCompaction', () => {
         input_cache_creation: 0,
       }),
     });
+    await ctx.expectResumeMatches();
+  });
+
+  it('persists opt-in Responses compaction as opaque context and projects it unchanged', async () => {
+    vi.stubEnv(OPENAI_RESPONSES_COMPACTION_FLAG_ENV, '1');
+    const compactOutput = [
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'retained' }] },
+      { type: 'compaction', id: 'cmp_probe', encrypted_content: 'opaque' },
+    ];
+    const compact = vi.fn().mockResolvedValue({
+      id: 'resp_compact_probe',
+      state: { protocol: 'openai_responses', items: compactOutput },
+      usage: { inputOther: 40, output: 12, inputCacheRead: 20, inputCacheCreation: 0 },
+    });
+    const ctx = testAgent({ compact });
+    ctx.configure({
+      provider: {
+        type: 'openai',
+        protocol: 'openai_responses',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.example/v1',
+        model: 'gpt-5.6-sol',
+        cacheKeyHeader: 'X-Pool-Session-ID',
+        nativeCompaction: true,
+      },
+      modelCapabilities: CATALOGUED_MODEL_CAPABILITIES,
+    });
+    ctx.appendExchange(1, 'old user', 'old assistant', 20);
+    const completed = ctx.once('compaction.completed');
+
+    await ctx.rpc.beginCompaction({ instruction: 'Keep the cache decision.' });
+    await completed;
+
+    expect(compact).toHaveBeenCalledOnce();
+    expect(compact.mock.calls[0]?.[1]).toContain('Compaction preference:\nKeep the cache decision.');
+    expect(compact.mock.calls[0]?.[2]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'user' }),
+        expect.objectContaining({ role: 'assistant' }),
+      ]),
+    );
+    expect(ctx.context.get()).toEqual([
+      expect.objectContaining({
+        role: 'user',
+        content: [],
+        providerState: { protocol: 'openai_responses', items: compactOutput },
+        origin: { kind: 'compaction_summary' },
+      }),
+    ]);
+    expect(ctx.project()).toEqual([
+      expect.objectContaining({
+        providerState: { protocol: 'openai_responses', items: compactOutput },
+      }),
+    ]);
+    const records = await ctx.persistedWireRecords();
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        type: 'context.apply_compaction',
+        providerState: { protocol: 'openai_responses', items: compactOutput },
+      }),
+    );
     await ctx.expectResumeMatches();
   });
 

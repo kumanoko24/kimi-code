@@ -56,6 +56,7 @@ import { createUserMessage, type Message } from '#/kosong/contract/message';
 import type { Tool } from '#/kosong/contract/tool';
 import { inputTotal, type TokenUsage } from '#/kosong/contract/usage';
 import { IEventBus } from '#/app/event/eventBus';
+import { IFlagService } from '#/app/flag/flag';
 import type { CompactionFailedEvent, CompactionFinishedEvent } from '#/app/telemetry/events';
 import { ITelemetryService } from '#/app/telemetry/telemetry';
 import { ErrorCodes, Error2, isCodedError, isError2, toKimiErrorPayload, unwrapErrorCause } from "#/errors";
@@ -82,6 +83,7 @@ import {
 } from './types';
 import { Emitter, type Event } from '#/_base/event';
 import { OrderedHookSlot } from '#/hooks';
+import { OPENAI_RESPONSES_COMPACTION_FLAG_ID } from './flag';
 
 export const MAX_COMPACTION_RETRY_ATTEMPTS = 5;
 const DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS = 128 * 1024;
@@ -93,6 +95,7 @@ const EMPTY_TOOL_PARAMETERS: Record<string, unknown> = {
   type: 'object',
   properties: {},
 };
+const NATIVE_COMPACTION_SUMMARY = 'OpenAI Responses native compaction state.';
 
 type CompactionTelemetryProperties = Pick<
   CompactionFinishedEvent,
@@ -166,6 +169,7 @@ export class AgentFullCompactionService extends Disposable implements IAgentFull
     @ILogService private readonly log: ILogService,
     @IAgentLoopService private readonly loopService: IAgentLoopService,
     @IAgentStateService private readonly states: IAgentStateService,
+    @IFlagService private readonly flags: IFlagService,
   ) {
     super();
     this.states.register(fullCompactionCompactionCountInTurnKey);
@@ -608,6 +612,16 @@ export class AgentFullCompactionService extends Disposable implements IAgentFull
 
       const resolvedModel = this.profile.resolveModelContext();
       thinkingEffort = resolvedModel.thinkingLevel;
+      const nativeResult = await this.tryNativeCompaction({
+        active,
+        data,
+        originalHistory,
+        tokensBefore,
+        startedAt,
+        thinkingEffort,
+        signal,
+      });
+      if (nativeResult !== undefined) return nativeResult;
       const maxContextTokens = resolvedModel.modelCapabilities.max_context_tokens;
       const defaultCompactionCap =
         maxContextTokens > 0
@@ -760,6 +774,70 @@ export class AgentFullCompactionService extends Disposable implements IAgentFull
       }
       throw new Error2(ErrorCodes.COMPACTION_FAILED, String(error), { cause: error });
     }
+  }
+
+  private async tryNativeCompaction(input: {
+    readonly active: ActiveCompaction;
+    readonly data: Readonly<CompactionBeginData>;
+    readonly originalHistory: readonly ContextMessage[];
+    readonly tokensBefore: number;
+    readonly startedAt: number;
+    readonly thinkingEffort: string;
+    readonly signal: AbortSignal;
+  }): Promise<CompactionResult | undefined> {
+    if (!this.flags.enabled(OPENAI_RESPONSES_COMPACTION_FLAG_ID)) return undefined;
+    if (this.llmRequester.compact === undefined) return undefined;
+    const customInstruction = input.data.instruction?.trim();
+    const systemPrompt =
+      customInstruction === undefined || customInstruction.length === 0
+        ? this.profile.getSystemPrompt()
+        : `${this.profile.getSystemPrompt()}\n\nCompaction preference:\n${customInstruction}`;
+    const compacted = await this.llmRequester.compact(
+      {
+        messages: stripDynamicToolContext(input.originalHistory),
+        systemPrompt,
+        source: {
+          type: 'operation',
+          turnId: input.active.originTurnId,
+          requestKind: 'full_compaction',
+          logFields: { nativeCompaction: true },
+        },
+      },
+      input.signal,
+    );
+    if (compacted === undefined) return undefined;
+    if (!historySafeToCompact(this.context.get(), input.originalHistory)) {
+      const active = this._compacting;
+      if (active !== null) this.cancelActive(active);
+      throw compactionCancelledReason(active);
+    }
+
+    const appended = this.context.get().slice(input.originalHistory.length);
+    const measuredNativeTokens =
+      compacted.usage.output > 0
+        ? compacted.usage.output + estimateTokensForMessages(appended)
+        : undefined;
+    const result = this.context.applyCompaction({
+      summary: NATIVE_COMPACTION_SUMMARY,
+      compactedCount: input.originalHistory.length,
+      tokensBefore: input.tokensBefore,
+      tokensAfter: measuredNativeTokens,
+      providerState: compacted.state,
+    });
+    const properties: CompactionFinishedEvent = {
+      turn_id: input.active.originTurnId,
+      source: input.data.source,
+      tokens_before: result.tokensBefore,
+      tokens_after: result.tokensAfter,
+      duration_ms: Date.now() - input.startedAt,
+      compacted_count: result.compactedCount,
+      retry_count: 0,
+      round: 1,
+      thinking_effort: input.thinkingEffort,
+      ...usageTelemetry(compacted.usage),
+    };
+    this.telemetry.track2('compaction_finished', properties);
+    return result;
   }
 
   private postProcessSummary(summary: string): string {

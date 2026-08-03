@@ -49,6 +49,8 @@ export interface ProtocolProviderOptions {
   readonly vertexai?: boolean;
   readonly project?: string;
   readonly location?: string;
+  readonly cacheKeyHeader?: string;
+  readonly nativeCompaction?: boolean;
 }
 
 export interface ProtocolAdapterConfig {

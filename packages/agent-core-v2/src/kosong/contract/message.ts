@@ -59,6 +59,12 @@ export interface ToolCallPart {
 
 export type StreamedMessagePart = ContentPart | ToolCall | ToolCallPart;
 
+/** Opaque provider-native context that only its originating wire protocol may encode. */
+export interface ProviderState {
+  readonly protocol: string;
+  readonly items: readonly unknown[];
+}
+
 export interface Message {
   readonly role: Role;
   readonly name?: string;
@@ -67,6 +73,7 @@ export interface Message {
   readonly toolCallId?: string;
   readonly partial?: boolean;
   readonly tools?: readonly Tool[];
+  readonly providerState?: ProviderState;
 }
 
 export function isContentPart(part: StreamedMessagePart): part is ContentPart {

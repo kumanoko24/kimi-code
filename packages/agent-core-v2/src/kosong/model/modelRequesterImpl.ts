@@ -21,8 +21,13 @@
  */
 
 import { AsyncEventQueue } from '#/_base/asyncEventQueue';
-import type { VideoURLPart } from '#/kosong/contract/message';
-import { APIStatusError, isAbortError, VideoUploadUnsupportedError } from '#/kosong/contract/errors';
+import type { Message, VideoURLPart } from '#/kosong/contract/message';
+import {
+  APIStatusError,
+  ChatProviderError,
+  isAbortError,
+  VideoUploadUnsupportedError,
+} from '#/kosong/contract/errors';
 import { generate, type GenerateResult } from '#/kosong/contract/generate';
 import type {
   ChatProvider,
@@ -41,6 +46,7 @@ import type {
   ModelRequestParams,
   ModelRequester,
   ModelRequestTiming,
+  ModelCompactionResult,
 } from './modelRequester';
 
 export class ModelRequesterImpl implements ModelRequester {
@@ -78,6 +84,30 @@ export class ModelRequesterImpl implements ModelRequester {
     return queue;
   }
 
+  async compact(
+    input: Pick<ModelRequestInput, 'systemPrompt' | 'messages'>,
+    signal?: AbortSignal,
+    params?: ModelRequestParams,
+  ): Promise<ModelCompactionResult | undefined> {
+    signal?.throwIfAborted();
+    const provider = this.resolveChatProvider();
+    if (provider.compact === undefined) return undefined;
+    this.assertProviderStateCompatibility(input.messages);
+    try {
+      return await this.runWithAuthRefresh((auth) =>
+        provider.compact!(input.systemPrompt, [...input.messages], {
+          signal,
+          auth,
+          cacheKey: params?.cacheKey,
+          onTraceId: params?.onTraceId,
+        }),
+      );
+    } catch (error) {
+      if (isAbortError(error) || signal?.aborted === true) throw error;
+      throw translateProviderError(error);
+    }
+  }
+
   async uploadVideo(
     input: string | VideoUploadInput,
     options?: { readonly signal?: AbortSignal },
@@ -101,6 +131,7 @@ export class ModelRequesterImpl implements ModelRequester {
     params?: ModelRequestParams,
   ): Promise<void> {
     signal?.throwIfAborted();
+    this.assertProviderStateCompatibility(input.messages);
     const provider = this.resolveChatProvider();
 
     let requestStartedAt = Date.now();
@@ -118,6 +149,7 @@ export class ModelRequesterImpl implements ModelRequester {
           ? undefined
           : { effort: params.thinkingEffort, keep: params.thinkingKeep },
       maxCompletionTokens: params?.maxCompletionTokens,
+      maxCompletionTokensMode: params?.maxCompletionTokensMode,
       usedContextTokens: params?.usedContextTokens,
       maxContextTokens: params?.maxContextTokens,
       onRequestStart: () => {
@@ -180,6 +212,18 @@ export class ModelRequesterImpl implements ModelRequester {
         ),
       });
     }
+  }
+
+  private assertProviderStateCompatibility(messages: readonly Message[]): void {
+    const incompatible = messages.find(
+      (message) =>
+        message.providerState !== undefined &&
+        message.providerState.protocol !== this.model.protocol,
+    );
+    if (incompatible?.providerState === undefined) return;
+    throw new ChatProviderError(
+      `Provider-native context for protocol "${incompatible.providerState.protocol}" cannot be sent through "${this.model.protocol}". Start a new session or switch back to the original protocol.`,
+    );
   }
 
   private async runWithAuthRefresh<T>(

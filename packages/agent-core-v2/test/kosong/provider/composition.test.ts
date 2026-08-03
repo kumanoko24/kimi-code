@@ -657,19 +657,134 @@ async function captureGoogleBody(
 async function captureResponsesBody(
   provider: ChatProvider,
   options?: GenerateOptions,
+  history: Message[] = PROBE_HISTORY,
 ): Promise<Record<string, unknown>> {
+  return (await captureResponsesRequest(provider, options, history)).params;
+}
+
+async function captureResponsesRequest(
+  provider: ChatProvider,
+  options?: GenerateOptions,
+  history: Message[] = PROBE_HISTORY,
+): Promise<{
+  readonly params: Record<string, unknown>;
+  readonly requestOptions: Record<string, unknown> | undefined;
+}> {
   let captured: Record<string, unknown> | undefined;
+  let capturedRequestOptions: Record<string, unknown> | undefined;
   const client = sdkClient(provider) as { responses: { create: unknown } };
-  client.responses.create = vi.fn().mockImplementation((params: unknown) => {
+  client.responses.create = vi.fn().mockImplementation((params: unknown, requestOptions: unknown) => {
     captured = params as Record<string, unknown>;
+    capturedRequestOptions = requestOptions as Record<string, unknown> | undefined;
     return Promise.resolve(responsesEventStream());
   });
-  await drain(await provider.generate('', [], PROBE_HISTORY, options));
+  await drain(await provider.generate('', [], history, options));
   if (captured === undefined) throw new Error('expected responses.create to be called');
-  return captured;
+  return { params: captured, requestOptions: capturedRequestOptions };
 }
 
 describe('per-turn intent wire encoding (behavior probes)', () => {
+  it('omits a context-derived Responses output cap but preserves an explicit hard cap', async () => {
+    const provider = new OpenAIResponsesChatProvider({ model: 'gpt-5.6-sol', apiKey: 'sk-probe' });
+
+    const fallback = await captureResponsesBody(provider, {
+      maxCompletionTokens: 258000,
+      maxCompletionTokensMode: 'fallback',
+    });
+    const hardCap = await captureResponsesBody(provider, {
+      maxCompletionTokens: 8192,
+      maxCompletionTokensMode: 'hard_cap',
+    });
+
+    expect(fallback).not.toHaveProperty('max_output_tokens');
+    expect(hardCap['max_output_tokens']).toBe(8192);
+  });
+
+  it('sends one per-session cache identity in the Responses body and configured header', async () => {
+    const provider = new OpenAIResponsesChatProvider({
+      model: 'gpt-5.6-sol',
+      apiKey: 'sk-probe',
+      cacheKeyHeader: 'X-Pool-Session-ID',
+    });
+
+    const request = await captureResponsesRequest(provider, { cacheKey: 'session-probe' });
+
+    expect(request.params['prompt_cache_key']).toBe('session-probe');
+    expect(request.requestOptions?.['headers']).toEqual({
+      'X-Pool-Session-ID': 'session-probe',
+    });
+  });
+
+  it('calls the opt-in Responses compact endpoint and returns opaque provider state', async () => {
+    const provider = new OpenAIResponsesChatProvider({
+      model: 'gpt-5.6-sol',
+      apiKey: 'sk-probe',
+      cacheKeyHeader: 'X-Pool-Session-ID',
+      nativeCompaction: true,
+    });
+    const compactOutput = [
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'keep me' }] },
+      { type: 'compaction', id: 'cmp_probe', encrypted_content: 'opaque' },
+    ];
+    let params: Record<string, unknown> | undefined;
+    let requestOptions: Record<string, unknown> | undefined;
+    const client = sdkClient(provider) as { responses: { compact: unknown } };
+    client.responses.compact = vi.fn().mockImplementation((body: unknown, options: unknown) => {
+      params = body as Record<string, unknown>;
+      requestOptions = options as Record<string, unknown>;
+      return Promise.resolve({
+        id: 'resp_compact_probe',
+        object: 'response.compaction',
+        output: compactOutput,
+        usage: {
+          input_tokens: 20,
+          output_tokens: 5,
+          input_tokens_details: { cached_tokens: 8 },
+        },
+      });
+    });
+
+    const result = await provider.compact!('system prompt', PROBE_HISTORY, {
+      cacheKey: 'session-probe',
+    });
+
+    expect(params).toMatchObject({
+      model: 'gpt-5.6-sol',
+      instructions: 'system prompt',
+      prompt_cache_key: 'session-probe',
+      input: expect.any(Array),
+    });
+    expect(requestOptions?.['headers']).toEqual({ 'X-Pool-Session-ID': 'session-probe' });
+    expect(result).toEqual({
+      id: 'resp_compact_probe',
+      state: { protocol: 'openai_responses', items: compactOutput },
+      usage: { inputOther: 12, output: 5, inputCacheRead: 8, inputCacheCreation: 0 },
+    });
+  });
+
+  it('replays opaque Responses compaction items unchanged before new messages', async () => {
+    const provider = new OpenAIResponsesChatProvider({ model: 'gpt-5.6-sol', apiKey: 'sk-probe' });
+    const items = [
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'retained' }] },
+      { type: 'compaction', id: 'cmp_probe', encrypted_content: 'opaque' },
+    ];
+    const history: Message[] = [
+      {
+        role: 'user',
+        content: [],
+        toolCalls: [],
+        providerState: { protocol: 'openai_responses', items },
+      },
+      { role: 'user', content: [{ type: 'text', text: 'continue' }], toolCalls: [] },
+    ];
+
+    const body = await captureResponsesBody(provider, undefined, history);
+
+    expect(body['input']).toEqual([
+      ...items,
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'continue' }] },
+    ]);
+  });
   it('encodes cacheKey + thinking + budget on the Kimi wire as prompt_cache_key + expanded thinking, never reasoning_effort', async () => {
     const provider = registry.createChatProvider({
       protocol: 'openai',

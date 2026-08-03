@@ -4,7 +4,7 @@
  */
 
 import { estimateTokens, estimateTokensForMessage, estimateTokensForMessages } from '#/kosong/contract/tokens';
-import type { ContentPart } from '#/kosong/contract/message';
+import type { ContentPart, ProviderState } from '#/kosong/contract/message';
 import summaryPrefixTemplate from './compaction-summary-prefix.md?raw';
 import type { ContextMessage, PromptOrigin } from './types';
 
@@ -33,6 +33,7 @@ export interface ContextCompactionShapeInput {
   readonly keptHeadUserMessageCount?: number;
   readonly droppedCount?: number;
   readonly legacyTail?: boolean;
+  readonly providerState?: ProviderState;
 }
 
 export interface ContextCompactionShape {
@@ -51,6 +52,21 @@ export function buildContextCompactionShape(
   history: readonly ContextMessage[],
   input: ContextCompactionShapeInput,
 ): ContextCompactionShape {
+  if (input.providerState !== undefined) {
+    const message = createProviderStateMessage(input.providerState);
+    const tail = history.slice(input.compactedCount);
+    return {
+      summary: input.summary,
+      contextSummary: input.contextSummary ?? input.summary,
+      compactedCount: input.compactedCount,
+      tokensBefore: input.tokensBefore,
+      tokensAfter:
+        input.tokensAfter ?? estimateTokensForMessage(message) + estimateTokensForMessages(tail),
+      keptUserMessageCount: tail.length,
+      droppedCount: input.droppedCount,
+      messages: [message, ...tail],
+    };
+  }
   if (usesLegacyTailShape(input)) {
     const contextSummary = input.contextSummary ?? input.summary;
     const messages = [
@@ -95,6 +111,16 @@ export function buildContextCompactionShape(
     keptHeadUserMessageCount,
     droppedCount: input.droppedCount,
     messages: [...keptMessages, createCompactionSummaryMessage(contextSummary)],
+  };
+}
+
+export function createProviderStateMessage(providerState: ProviderState): ContextMessage {
+  return {
+    role: 'user',
+    content: [],
+    toolCalls: [],
+    providerState,
+    origin: { kind: 'compaction_summary' },
   };
 }
 

@@ -630,6 +630,12 @@ function buildProtocolProviderOptions(
     }
     case 'openai_responses':
       if (model.offEffort !== undefined) options.offEffort = model.offEffort;
+      if (provider?.cacheKeyHeader !== undefined) {
+        options.cacheKeyHeader = provider.cacheKeyHeader;
+      }
+      if (provider?.nativeCompaction !== undefined) {
+        options.nativeCompaction = provider.nativeCompaction;
+      }
       break;
     default: {
       const exhaustive: never = protocol;

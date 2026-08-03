@@ -72,8 +72,21 @@ describe('completionBudgetParams (the budget fold)', () => {
       }),
     ).toEqual({
       maxCompletionTokens: 8192,
+      maxCompletionTokensMode: 'hard_cap',
       usedContextTokens: 5000,
       maxContextTokens: 128000,
+    });
+  });
+
+  it('marks a context-derived completion budget as fallback policy', () => {
+    expect(
+      completionBudgetParams({
+        budget: { fallback: 32000 },
+        capability: capability(258000),
+      }),
+    ).toMatchObject({
+      maxCompletionTokens: 258000,
+      maxCompletionTokensMode: 'fallback',
     });
   });
 

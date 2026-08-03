@@ -34,6 +34,8 @@ registerProtocolBase({
         defaultHeaders: traitDefaultHeaders(traits),
         maxOutputTokens: config.providerOptions?.defaultMaxTokens,
         offEffort: config.providerOptions?.offEffort,
+        cacheKeyHeader: config.providerOptions?.cacheKeyHeader,
+        nativeCompaction: config.providerOptions?.nativeCompaction,
         convertError: traitConvertError(traits),
       }),
     });

@@ -38,6 +38,7 @@ export interface CompletionBudgetConfig {
 
 export interface CompletionBudgetParams {
   readonly maxCompletionTokens: number;
+  readonly maxCompletionTokensMode: 'hard_cap' | 'fallback';
   readonly usedContextTokens?: number;
   readonly maxContextTokens?: number;
 }

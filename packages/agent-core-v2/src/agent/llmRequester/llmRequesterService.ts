@@ -227,6 +227,47 @@ export class AgentLLMRequesterService implements IAgentLLMRequesterService {
     return this.start(overrides, onPart, signal).result;
   }
 
+  async compact(
+    overrides: Pick<AgentLLMRequestOverrides, 'messages' | 'systemPrompt' | 'source'> = {},
+    signal?: AbortSignal,
+  ) {
+    signal?.throwIfAborted();
+    const startedAt = Date.now();
+    try {
+      const request = this.resolveRequest(overrides);
+      const shaped = this.toolSelect.shapeHistory(request.messages);
+      const projected = this.projector.project(shaped);
+      const messages = await this.videoResolver.resolve(projected, request.requester, signal);
+      if (request.requester.compact === undefined) return undefined;
+      this.log.info('native provider compaction started', {
+        model: request.modelAlias,
+        protocol: request.model.protocol,
+        messageCount: messages.length,
+        ...request.logFields,
+      });
+      const result = await request.requester.compact(
+        { systemPrompt: request.systemPrompt, messages },
+        signal,
+        request.params,
+      );
+      if (result === undefined) return undefined;
+      this.usage.record(request.modelAlias, result.usage, request.source);
+      this.log.info('native provider compaction completed', {
+        model: request.modelAlias,
+        protocol: request.model.protocol,
+        durationMs: Date.now() - startedAt,
+        inputTokens: inputTotal(result.usage),
+        outputTokens: result.usage.output,
+        ...request.logFields,
+      });
+      return result;
+    } catch (error) {
+      this.logRequestFailure(error, overrides, signal);
+      this.trackApiError(error, startedAt, signal, overrides.source);
+      throw error;
+    }
+  }
+
   start(
     overrides: AgentLLMRequestOverrides = {},
     onPart: AgentLLMRequestPartHandler = noopOnPart,

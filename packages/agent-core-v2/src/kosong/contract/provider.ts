@@ -16,7 +16,7 @@
  * Pure types only — no other domain, no I/O, no SDKs.
  */
 
-import type { Message, StreamedMessagePart, VideoURLPart } from './message';
+import type { Message, ProviderState, StreamedMessagePart, VideoURLPart } from './message';
 import type { Tool } from './tool';
 import type { TokenUsage } from './usage';
 
@@ -96,12 +96,19 @@ export interface GenerateOptions {
   sampling?: SamplingOptions;
   thinking?: ThinkingRequestOptions;
   maxCompletionTokens?: number;
+  maxCompletionTokensMode?: 'hard_cap' | 'fallback';
   usedContextTokens?: number;
   maxContextTokens?: number;
   onRequestStart?: () => void;
   onRequestSent?: () => void;
   onStreamEnd?: (stats?: StreamDecodeStats) => void;
   onTraceId?: (traceId: string | null) => void;
+}
+
+export interface ProviderCompactionResult {
+  readonly state: ProviderState;
+  readonly usage: TokenUsage;
+  readonly id?: string;
 }
 
 export interface ChatProvider {
@@ -115,5 +122,10 @@ export interface ChatProvider {
     history: Message[],
     options?: GenerateOptions,
   ): Promise<StreamedMessage>;
+  compact?(
+    systemPrompt: string,
+    history: Message[],
+    options?: GenerateOptions,
+  ): Promise<ProviderCompactionResult>;
   uploadVideo?(input: string | VideoUploadInput, options?: GenerateOptions): Promise<VideoURLPart>;
 }

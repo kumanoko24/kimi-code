@@ -4,7 +4,7 @@ import type { Message, StreamedMessagePart } from '#/kosong/contract/message';
 import type { Tool } from '#/kosong/contract/tool';
 import type { TokenUsage } from '#/kosong/contract/usage';
 import type { LLMRequestTrace } from '#/kosong/contract/requestTrace';
-import type { ModelRequestTiming } from '#/kosong/model/modelRequester';
+import type { ModelCompactionResult, ModelRequestTiming } from '#/kosong/model/modelRequester';
 import type { LogContext } from '#/_base/log/log';
 
 export type AgentLLMRequestLogFields = Readonly<LogContext>;
@@ -69,6 +69,11 @@ export interface IAgentLLMRequesterService {
     onPart?: AgentLLMRequestPartHandler,
     signal?: AbortSignal,
   ): AgentLLMRequestTask;
+
+  compact?(
+    overrides?: Pick<AgentLLMRequestOverrides, 'messages' | 'systemPrompt' | 'source'>,
+    signal?: AbortSignal,
+  ): Promise<ModelCompactionResult | undefined>;
 }
 
 export const IAgentLLMRequesterService = createDecorator<IAgentLLMRequesterService>(

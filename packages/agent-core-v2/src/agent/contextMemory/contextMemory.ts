@@ -1,4 +1,5 @@
 import { createDecorator } from "#/_base/di/instantiation";
+import type { ProviderState } from '#/kosong/contract/message';
 
 import type { UndoCut } from './contextOps';
 import type { LoopRecordedEvent } from './loopEventFold';
@@ -13,6 +14,7 @@ export interface ContextCompactionInput {
   readonly keptUserMessageCount?: number;
   readonly keptHeadUserMessageCount?: number;
   readonly droppedCount?: number;
+  readonly providerState?: ProviderState;
 }
 
 export interface ContextCompactionResult {

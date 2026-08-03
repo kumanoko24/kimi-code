@@ -434,7 +434,11 @@ function project(history: readonly ContextMessage[], onAnomaly?: OnAnomaly): Mes
 
   const emit = (source: ContextMessage): void => {
     const content = projectedContent(source, onAnomaly);
-    if (source.toolCalls.length === 0 && !hasDeclaredTools(source)) {
+    if (
+      source.providerState === undefined &&
+      source.toolCalls.length === 0 &&
+      !hasDeclaredTools(source)
+    ) {
       if (content.length === 0) return;
       if (content.every(isVacuousContentPart)) {
         onAnomaly?.({ kind: 'vacuous_message_dropped', role: source.role });
@@ -621,6 +625,7 @@ function toWireMessage(message: ContextMessage, content: ContentPart[]): Message
     toolCallId: message.toolCallId,
     partial: message.partial,
     tools: message.tools,
+    providerState: message.providerState,
   };
 }
 

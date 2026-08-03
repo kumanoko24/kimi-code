@@ -72,16 +72,24 @@ import type {
 } from '#/tool/toolContract';
 import { AGENT_WIRE_RECORD_KEY, wireRecordToPayload, type WireRecord } from '#/wire/record';
 import { OP_REGISTRY } from '#/wire/op';
-import { IProtocolAdapterRegistry, type ProtocolAdapterConfig } from '#/kosong/protocol/protocol';
+import {
+  IProtocolAdapterRegistry,
+  type Protocol,
+  type ProtocolAdapterConfig,
+} from '#/kosong/protocol/protocol';
 import { ProtocolAdapterRegistry } from '#/kosong/provider/protocolAdapterRegistry';
 import { hasProviderDefinition } from '#/kosong/provider/providerDefinition';
 import type { SkillCatalog } from '#/app/skillCatalog/types';
 import { type ModelCapability } from '#/kosong/contract/capability';
 import { isToolCall, isToolCallPart, type ContentPart, type Message as KosongMessage, type StreamedMessagePart } from '#/kosong/contract/message';
-import { type ThinkingEffort } from '#/kosong/contract/provider';
 import { type Tool as KosongTool } from '#/kosong/contract/tool';
 import type { generate as kosongGenerate } from '#/kosong/contract/generate';
-import type { ChatProvider, GenerateOptions, StreamedMessage } from '#/kosong/contract/provider';
+import type {
+  ChatProvider,
+  GenerateOptions,
+  StreamedMessage,
+  ThinkingEffort,
+} from '#/kosong/contract/provider';
 import type { ILogger, LogContext, LogLevel } from '#/_base/log/log';
 import { ILogOptions } from '#/_base/log/logConfig';
 import type { EnabledPluginSessionStart } from '#/app/plugin/types';
@@ -228,6 +236,7 @@ interface KimiConfig {
 interface ModelConfigForConfig {
   readonly provider: string;
   readonly model: string;
+  readonly protocol?: Protocol;
   readonly maxContextSize: number;
   readonly maxOutputSize?: number;
   readonly capabilities?: readonly string[];
@@ -239,6 +248,8 @@ interface ProviderConfigForConfig {
   readonly type: ProviderConfig['type'];
   readonly apiKey?: string;
   readonly baseUrl?: string;
+  readonly cacheKeyHeader?: string;
+  readonly nativeCompaction?: boolean;
   readonly oauth?: {
     readonly storage: 'file' | 'keyring';
     readonly key: string;
@@ -256,6 +267,9 @@ interface TestProviderConfig {
   readonly model: string;
   readonly apiKey?: string;
   readonly baseUrl?: string;
+  readonly protocol?: Protocol;
+  readonly cacheKeyHeader?: string;
+  readonly nativeCompaction?: boolean;
 }
 
 interface Logger {
@@ -390,6 +404,7 @@ export type TestAgentContext = AgentTestContext;
 
 export interface TestAgentOptions {
   readonly generate?: GenerateFn | undefined;
+  readonly compact?: TestCompactFn | undefined;
   readonly telemetry?: ITelemetryService | undefined;
   readonly persistence?: WireRecordPersistence | undefined;
   readonly hookEngine?:
@@ -1090,6 +1105,7 @@ export class AgentTestContext {
             IProtocolAdapterRegistry,
             createGenerateBackedProtocolRegistry(
               options.generate ?? this.scriptedGenerate.generate,
+              options.compact,
             ),
           );
           reg.defineInstance(
@@ -2605,6 +2621,7 @@ function configWithProvider(
       [provider.model]: {
         provider: providerName,
         model: provider.model,
+        protocol: provider.protocol,
         maxContextSize:
           maxContextSize === undefined || maxContextSize <= 0 ? 1_000_000 : maxContextSize,
         capabilities: capabilityNames(modelCapabilities),
@@ -2620,6 +2637,8 @@ function providerConfigForAlias(provider: TestProviderConfig): KimiConfig['provi
     type: provider.type,
     apiKey: provider.apiKey,
     baseUrl: provider.baseUrl,
+    cacheKeyHeader: provider.cacheKeyHeader,
+    nativeCompaction: provider.nativeCompaction,
   };
 }
 
@@ -2698,7 +2717,17 @@ function createLogService(logger: Logger | undefined, bindings: LogContext = {})
  * sampling / thinking / budget) are forwarded into the `GenerateFn` so tests
  * assert them as request parameters instead of morph-era provider state.
  */
-function createGenerateBackedProtocolRegistry(generate: GenerateFn): IProtocolAdapterRegistry {
+type TestCompactFn = (
+  provider: ChatProvider,
+  systemPrompt: string,
+  history: KosongMessage[],
+  options?: GenerateOptions,
+) => ReturnType<NonNullable<ChatProvider['compact']>>;
+
+function createGenerateBackedProtocolRegistry(
+  generate: GenerateFn,
+  compact?: TestCompactFn,
+): IProtocolAdapterRegistry {
   const real = new ProtocolAdapterRegistry();
   return {
     _serviceBrand: undefined,
@@ -2713,9 +2742,9 @@ function createGenerateBackedProtocolRegistry(generate: GenerateFn): IProtocolAd
       real.explainCapability(protocol, modelName, providerType),
     createChatProvider: (input: ProtocolAdapterConfig) => {
       if (input.providerType !== undefined && hasProviderDefinition(input.providerType)) {
-        return replaceProviderGenerate(real.createChatProvider(input), generate);
+        return replaceProviderGenerate(real.createChatProvider(input), generate, compact);
       }
-      return new GenerateBackedChatProvider(input, generate);
+      return new GenerateBackedChatProvider(input, generate, compact);
     },
   } as IProtocolAdapterRegistry;
 }
@@ -2726,7 +2755,11 @@ function createGenerateBackedProtocolRegistry(generate: GenerateFn): IProtocolAd
  * the trait-bound `uploadVideo` — delegates to the composed provider, and the
  * scripted `GenerateFn` receives the composed provider as its `chat` argument.
  */
-function replaceProviderGenerate(provider: ChatProvider, generate: GenerateFn): ChatProvider {
+function replaceProviderGenerate(
+  provider: ChatProvider,
+  generate: GenerateFn,
+  compact?: TestCompactFn,
+): ChatProvider {
   const replaced: ChatProvider = {
     get name() {
       return provider.name;
@@ -2746,6 +2779,10 @@ function replaceProviderGenerate(provider: ChatProvider, generate: GenerateFn): 
   if (provider.uploadVideo !== undefined) {
     replaced.uploadVideo = (input, options) => provider.uploadVideo!(input, options);
   }
+  if (compact !== undefined) {
+    replaced.compact = (systemPrompt, history, options) =>
+      compact(provider, systemPrompt, history, options);
+  }
   return replaced;
 }
 
@@ -2754,14 +2791,20 @@ class GenerateBackedChatProvider implements ChatProvider {
   readonly modelName: string;
   readonly thinkingEffort: ThinkingEffort | null = null;
   readonly maxCompletionTokens: number | undefined;
+  readonly compact?: ChatProvider['compact'];
 
   constructor(
     config: ProtocolAdapterConfig,
     private readonly generateFn: GenerateFn,
+    compact?: TestCompactFn,
   ) {
     this.name = config.providerType ?? config.protocol;
     this.modelName = config.modelName;
     this.maxCompletionTokens = config.providerOptions?.defaultMaxTokens;
+    if (compact !== undefined) {
+      this.compact = (systemPrompt, history, options) =>
+        compact(this, systemPrompt, history, options);
+    }
   }
 
   async generate(
@@ -2803,6 +2846,7 @@ async function generateBackedResponse(
       sampling: options?.sampling,
       thinking: options?.thinking,
       maxCompletionTokens: options?.maxCompletionTokens,
+      maxCompletionTokensMode: options?.maxCompletionTokensMode,
       usedContextTokens: options?.usedContextTokens,
       maxContextTokens: options?.maxContextTokens,
       responseFormat: options?.responseFormat,

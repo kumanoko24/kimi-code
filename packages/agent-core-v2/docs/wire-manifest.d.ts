@@ -133,6 +133,10 @@ interface ContextAppendMessagePayload {
       parameters: Record<string, unknown>;
       deferred?: true;
     }[];
+    providerState?: {
+      protocol: string;
+      items: unknown[];
+    };
     id?: string;
     providerMessageId?: string;
     origin?: 'user' | 'skill_activation' | 'plugin_command' | 'injection' | 'shell_command' | 'compaction_summary' | 'system_trigger' | 'task' | 'cron_job' | 'cron_missed' | 'hook_result' | 'retry' | undefined;

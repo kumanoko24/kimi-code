@@ -58,8 +58,19 @@ export function estimateTokensForMessage(message: Message): number {
       total += estimateTokens(JSON.stringify(call.arguments));
     }
   }
+  if (message.providerState !== undefined) {
+    total += estimateProviderState(message.providerState.items);
+  }
   messageTokenEstimateCache.set(message, total);
   return total;
+}
+
+function estimateProviderState(items: readonly unknown[]): number {
+  try {
+    return estimateTokens(JSON.stringify(items));
+  } catch {
+    return 0;
+  }
 }
 
 export function estimateTokensForContentParts(parts: readonly ContentPart[]): number {

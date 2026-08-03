@@ -512,6 +512,38 @@ describe('headers merge order', () => {
   });
 });
 
+describe('OpenAI Responses provider options', () => {
+  it('materializes native compaction and the dynamic cache-key header from provider config', () => {
+    const { host, catalog } = createHost({
+      providers: {
+        local: {
+          type: 'openai',
+          apiKey: 'sk-test',
+          baseUrl: 'https://api.example.test/v1',
+          cacheKeyHeader: 'X-Pool-Session-ID',
+          nativeCompaction: true,
+        },
+      },
+      models: {
+        sol: {
+          provider: 'local',
+          protocol: 'openai_responses',
+          model: 'gpt-5.6-sol',
+          maxContextSize: 258000,
+        },
+      },
+    });
+    try {
+      expect(catalog.get('sol').providerOptions).toMatchObject({
+        cacheKeyHeader: 'X-Pool-Session-ID',
+        nativeCompaction: true,
+      });
+    } finally {
+      host.dispose();
+    }
+  });
+});
+
 describe('ModelCatalog inspect', () => {
   it('builds the god object with per-field provenance (kimi structured model)', () => {
     const { host, catalog } = createHost(kimiSections);

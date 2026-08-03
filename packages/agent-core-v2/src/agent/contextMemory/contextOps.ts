@@ -40,7 +40,7 @@
 import { z } from 'zod';
 
 import { ErrorCodes, Error2 } from '#/errors';
-import type { ContentPart } from '#/kosong/contract/message';
+import type { ContentPart, ProviderState } from '#/kosong/contract/message';
 import { defineModel, type PartsTransformer } from '#/wire/model';
 import type { WireRecord } from '#/wire/record';
 
@@ -143,6 +143,7 @@ declare module '#/wire/types' {
 }
 
 const contextMessageSchema = z.custom<ContextMessage>();
+const providerStateSchema = z.custom<ProviderState>();
 const loopRecordedEventSchema = z.custom<LoopRecordedEvent>();
 
 export const contextAppendMessage = ContextModel.defineOp('context.append_message', {
@@ -167,6 +168,7 @@ const contextCompactionBaseShape = {
   keptHeadUserMessageCount: z.number().optional(),
   droppedCount: z.number().optional(),
   legacyTail: z.boolean().optional(),
+  providerState: providerStateSchema.optional(),
 };
 
 const contextApplyCompactionSchema = z.union([
@@ -230,7 +232,16 @@ export function readContextCompactionShapeInput(
     keptHeadUserMessageCount: readOptionalNumber(fields, 'keptHeadUserMessageCount'),
     droppedCount: readOptionalNumber(fields, 'droppedCount'),
     legacyTail: readOptionalBoolean(fields, 'legacyTail') ?? keptUserMessageCount === undefined,
+    providerState: readProviderState(fields),
   };
+}
+
+function readProviderState(record: UnknownRecord): ProviderState | undefined {
+  const value = record['providerState'];
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const protocol = (value as { protocol?: unknown }).protocol;
+  const items = (value as { items?: unknown }).items;
+  return typeof protocol === 'string' && Array.isArray(items) ? { protocol, items } : undefined;
 }
 
 export function readContextCompactedCount(record: ContextCompactionRecord): number {

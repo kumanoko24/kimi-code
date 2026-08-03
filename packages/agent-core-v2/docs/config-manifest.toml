@@ -278,6 +278,8 @@ merge_all_available_skills = true
   # model_source: "static" | "discover" | "oauth-catalog"
   # base_url: string
   # custom_headers: record<string, string>
+  # cache_key_header: string
+  # native_compaction: boolean
   # default_model: string
   # type: string
   # api_key: string

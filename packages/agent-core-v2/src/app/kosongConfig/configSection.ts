@@ -61,12 +61,17 @@ export const OAuthRefSchema = z.object({
 export const ModelSourceSchema = z.enum(['static', 'discover', 'oauth-catalog']);
 
 const StringRecordSchema = z.record(z.string(), z.string());
+const HttpHeaderNameSchema = z
+  .string()
+  .regex(/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/, 'must be a valid HTTP header name');
 
 export const ProviderConfigSchema = z.object({
   modelSource: ModelSourceSchema.optional(),
 
   baseUrl: z.string().optional(),
   customHeaders: StringRecordSchema.optional(),
+  cacheKeyHeader: HttpHeaderNameSchema.optional(),
+  nativeCompaction: z.boolean().optional(),
   defaultModel: z.string().optional(),
 
   type: ProviderTypeSchema.optional(),

@@ -1042,6 +1042,7 @@ export interface AgentStateSnapshot {
       readonly thinkingEffort?: 'off' | 'on' | (string & {});
       readonly thinkingKeep?: string;
       readonly maxCompletionTokens?: number;
+      readonly maxCompletionTokensMode?: 'hard_cap' | 'fallback';
       readonly usedContextTokens?: number;
       readonly maxContextTokens?: number;
       readonly onTraceId?: (traceId: string | null) => void;

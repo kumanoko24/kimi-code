@@ -62,6 +62,7 @@ export function completionBudgetParams(args: {
       budget: args.budget,
       capability: args.capability,
     }),
+    maxCompletionTokensMode: args.budget.hardCap === undefined ? 'fallback' : 'hard_cap',
     usedContextTokens: args.usedContextTokens,
     maxContextTokens: args.capability?.max_context_tokens,
   };

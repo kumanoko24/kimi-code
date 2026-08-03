@@ -508,6 +508,7 @@ import '#/agent/externalHooks/configSection';
 export * from '#/agent/externalHooks/externalHooks';
 export * from '#/agent/externalHooks/externalHooksService';
 export * from '#/agent/fullCompaction/strategy';
+export * from '#/agent/fullCompaction/flag';
 export * from '#/agent/fullCompaction/fullCompaction';
 export * from '#/agent/fullCompaction/fullCompactionService';
 export * from '#/agent/fullCompaction/compactionOps';

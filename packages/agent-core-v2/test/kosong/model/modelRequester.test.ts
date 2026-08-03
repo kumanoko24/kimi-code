@@ -159,6 +159,7 @@ describe('ModelRequesterImpl request execution', () => {
           thinkingEffort: 'high',
           thinkingKeep: 'all',
           maxCompletionTokens: 1024,
+          maxCompletionTokensMode: 'hard_cap',
           usedContextTokens: 5000,
           maxContextTokens: 128000,
         },
@@ -173,9 +174,31 @@ describe('ModelRequesterImpl request execution', () => {
     expect(options?.sampling).toEqual({ temperature: 0.5, topP: 0.9 });
     expect(options?.thinking).toEqual({ effort: 'high', keep: 'all' });
     expect(options?.maxCompletionTokens).toBe(1024);
+    expect(options?.maxCompletionTokensMode).toBe('hard_cap');
     expect(options?.usedContextTokens).toBe(5000);
     expect(options?.maxContextTokens).toBe(128000);
     expect(options?.responseFormat).toEqual({ type: 'json_object' });
+  });
+
+  it('rejects opaque provider state before sending it through a different protocol', async () => {
+    const provider = new FakeChatProvider();
+    const requester = new ModelRequesterImpl(modelWith(staticAuth()), registryReturning(provider));
+    const messages: Message[] = [
+      {
+        role: 'user',
+        content: [],
+        toolCalls: [],
+        providerState: {
+          protocol: 'openai_responses',
+          items: [{ type: 'compaction', encrypted_content: 'opaque' }],
+        },
+      },
+    ];
+
+    await expect(collect(requester.request({ ...INPUT, messages }))).rejects.toThrow(
+      'cannot be sent through "openai"',
+    );
+    expect(provider.calls).toHaveLength(0);
   });
 
   it('omits the thinking intent when no effort is requested', async () => {
