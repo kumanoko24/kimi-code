@@ -95,7 +95,7 @@ api_key = "sk-xxxxx"
 
 ## `openai_responses`
 
-Corresponds to OpenAI's newer Responses API, always operating in streaming mode. Configuration is the same as `openai`.
+Corresponds to OpenAI's newer Responses API, always operating in streaming mode. It supports provider-native compaction and an optional dynamic cache header for compatible gateways.
 
 - Default `base_url`: `https://api.openai.com/v1`
 - Credential key names: `OPENAI_API_KEY`, `OPENAI_BASE_URL`
@@ -104,7 +104,32 @@ Corresponds to OpenAI's newer Responses API, always operating in streaming mode.
 [providers.openai-responses]
 type = "openai_responses"
 base_url = "https://api.openai.com/v1"
-api_key = "sk-xxxxx"
+api_key = "YOUR_API_KEY"
+```
+
+For a gateway that uses a request header for session affinity, configure `cache_key_header`. Kimi Code writes the same generated per-session value to that header and to the Responses API `prompt_cache_key`; it does not reuse one static value across sessions.
+
+To use provider-native compaction, enable the experiment and opt the provider in. `/compact` and automatic full compaction then call `POST /responses/compact`, persist the returned output as opaque provider state, and replay those items unchanged on the next Responses request. If either switch is off, Kimi Code uses its existing text-compaction path.
+
+```toml
+[experimental]
+openai-responses-compaction = true
+
+[providers.responses-gateway]
+type = "openai_responses"
+base_url = "https://gateway.example/v1"
+api_key = "YOUR_API_KEY"
+cache_key_header = "X-Session-ID"
+native_compaction = true
+
+[models."responses-gateway/example-model"]
+provider = "responses-gateway"
+model = "example-model"
+max_context_size = 258000
+max_input_size = 258000
+capabilities = ["thinking", "tool_use"]
+support_efforts = ["medium", "high", "xhigh"]
+default_effort = "medium"
 ```
 
 ## `google-genai`

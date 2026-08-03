@@ -129,6 +129,8 @@ timeout = 5
 | `oauth` | `table` | 否 | OAuth 凭据引用（`storage`、`key` 两个字段），由登录流程自动注入，通常无需手写 |
 | `env` | `table<string, string>` | 否 | 供应商凭证的备用来源，详见下文 |
 | `custom_headers` | `table<string, string>` | 否 | 每次请求附加的自定义 HTTP 头 |
+| `cache_key_header` | `string` | 否 | 仅 `openai_responses`。把与 `prompt_cache_key` 相同的稳定会话缓存键写入指定 HTTP 头，适用于按 header 路由或缓存的网关。与 `custom_headers` 不同，每个会话都会生成独立的值 |
+| `native_compaction` | `boolean` | 否 | 仅 `openai_responses`。声明供应商支持原生 `POST /responses/compact`；还需开启 `openai-responses-compaction` 实验功能 |
 
 **`env` 子表**：可以把供应商惯用的键名（如 `KIMI_API_KEY`）写在 `[providers.<name>.env]` 里，作为 `api_key` / `base_url` 的备用来源。这个子表**只在配置文件里读取**，不会修改 shell 环境：
 
@@ -318,15 +320,13 @@ disabled = ["EnterPlanMode", "ExitPlanMode", "mcp__github__*"]
 
 `max_edge_px` 可被环境变量 `KIMI_IMAGE_MAX_EDGE_PX` 覆盖，`read_byte_budget` 可被 `KIMI_IMAGE_READ_BYTE_BUDGET` 覆盖，优先级均高于配置文件。
 
-<!--
 ## `experimental`
 
-`experimental` 存放实验功能 flag 的持久化覆盖。目前 `micro_compaction` 是唯一用户可见的字段，默认值为 `false`；如需自动清理较旧的大型工具结果，把它设为 `true`。
+`experimental` 存放实验功能 flag 的持久化覆盖。
 
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `micro_compaction` | `boolean` | `false` | 清理较旧的大型工具结果内容，同时保留最近对话 |
--->
+| `openai-responses-compaction` | `boolean` | `false` | 允许配置了 `native_compaction = true` 的 `openai_responses` 供应商通过 `POST /responses/compact` 压缩上下文；否则 Kimi Code 继续使用文本压缩路径 |
 
 ## `services`
 

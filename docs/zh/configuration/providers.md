@@ -95,7 +95,7 @@ api_key = "sk-xxxxx"
 
 ## `openai_responses`
 
-对应 OpenAI 较新的 Responses API，始终以流式方式工作。配置方式与 `openai` 相同。
+对应 OpenAI 较新的 Responses API，始终以流式方式工作。它支持供应商原生压缩，也可以为兼容网关动态写入缓存 header。
 
 - 默认 `base_url`：`https://api.openai.com/v1`
 - 凭证键名：`OPENAI_API_KEY`、`OPENAI_BASE_URL`
@@ -104,7 +104,32 @@ api_key = "sk-xxxxx"
 [providers.openai-responses]
 type = "openai_responses"
 base_url = "https://api.openai.com/v1"
-api_key = "sk-xxxxx"
+api_key = "YOUR_API_KEY"
+```
+
+如果网关通过请求 header 保持会话亲和性，可配置 `cache_key_header`。Kimi Code 会把同一个自动生成的会话值写入该 header 和 Responses API 的 `prompt_cache_key`，不会让所有会话共用一个静态值。
+
+如需供应商原生压缩，请同时开启实验功能并让供应商显式 opt in。此后 `/compact` 和自动 full compaction 会调用 `POST /responses/compact`，把返回的 output 保存为不透明供应商状态，并在下一次 Responses 请求中原样重放。如果任一开关未启用，Kimi Code 会继续走现有的文本压缩路径。
+
+```toml
+[experimental]
+openai-responses-compaction = true
+
+[providers.responses-gateway]
+type = "openai_responses"
+base_url = "https://gateway.example/v1"
+api_key = "YOUR_API_KEY"
+cache_key_header = "X-Session-ID"
+native_compaction = true
+
+[models."responses-gateway/example-model"]
+provider = "responses-gateway"
+model = "example-model"
+max_context_size = 258000
+max_input_size = 258000
+capabilities = ["thinking", "tool_use"]
+support_efforts = ["medium", "high", "xhigh"]
+default_effort = "medium"
 ```
 
 ## `google-genai`

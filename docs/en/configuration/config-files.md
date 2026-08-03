@@ -129,6 +129,8 @@ Each entry in the `providers` table defines an API provider, keyed by a unique n
 | `oauth` | `table` | No | OAuth credential reference (`storage` and `key` fields); injected automatically by the login flow — normally no need to write this by hand |
 | `env` | `table<string, string>` | No | Fallback source for provider credentials; see below |
 | `custom_headers` | `table<string, string>` | No | Custom HTTP headers attached to each request |
+| `cache_key_header` | `string` | No | `openai_responses` only. HTTP header name that receives the same stable per-session cache key as `prompt_cache_key`; useful for gateways that route or cache by a header. Unlike `custom_headers`, the value is generated separately for each session |
+| `native_compaction` | `boolean` | No | `openai_responses` only. Advertise support for provider-native `POST /responses/compact`; also requires the `openai-responses-compaction` experimental flag |
 
 **`env` sub-table**: You can write provider-conventional key names (such as `KIMI_API_KEY`) inside `[providers.<name>.env]` as a fallback source for `api_key` / `base_url`. This sub-table is **read only from the config file** and does not modify the shell environment:
 
@@ -318,15 +320,13 @@ Like the `tools` / `disallowedTools` fields of an agent file, this section shape
 
 `max_edge_px` can be overridden by the `KIMI_IMAGE_MAX_EDGE_PX` environment variable and `read_byte_budget` by `KIMI_IMAGE_READ_BYTE_BUDGET`; both take higher priority than `config.toml`.
 
-<!--
 ## `experimental`
 
-`experimental` stores persistent overrides for experimental-feature flags. Currently, `micro_compaction` is the only user-facing entry and defaults to `false`; set it to `true` to enable automatic trimming of older large tool results.
+`experimental` stores persistent overrides for experimental-feature flags.
 
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
-| `micro_compaction` | `boolean` | `false` | Trim older large tool results from context while preserving recent conversation |
--->
+| `openai-responses-compaction` | `boolean` | `false` | Allow an `openai_responses` provider with `native_compaction = true` to compact through `POST /responses/compact`. Otherwise, Kimi Code keeps using its text-compaction path |
 
 ## `services`
 
