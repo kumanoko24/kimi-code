@@ -45,6 +45,14 @@ const IMPORT_CONTEXT_GUIDANCE =
   'This is a prior conversation history that may be relevant to the current session. ' +
   'Please review this context and use it to inform your responses.';
 
+function estimateProviderState(items: readonly unknown[]): number {
+  try {
+    return estimateTokens(JSON.stringify(items));
+  } catch {
+    return 0;
+  }
+}
+
 // Invariant: _history must not contain an unresolved tool call exchange except
 // at the tail. When the tail is unresolved, pendingToolResultIds is exactly the
 // set of missing tool result ids for that tail exchange; appendMessage keeps
@@ -346,10 +354,13 @@ export class ContextMemory {
           origin: { kind: 'injection', variant: COMPACTION_ELISION_VARIANT },
         }
       : null;
+    const nativeTail =
+      input.providerState === undefined ? undefined : this._history.slice(input.compactedCount);
     const keptMessages: ContextMessage[] =
-      elisionMessage === null
+      nativeTail ??
+      (elisionMessage === null
         ? [...selection.head, ...selection.tail]
-        : [...selection.head, elisionMessage, ...selection.tail];
+        : [...selection.head, elisionMessage, ...selection.tail]);
     // Live compaction omits these so they are derived from the actual
     // `_history`; restore passes the persisted record so its historical values
     // are preserved verbatim. Older wire records did not have `contextSummary`,
@@ -357,9 +368,12 @@ export class ContextMemory {
     const contextSummary = input.contextSummary ?? input.summary;
     const tokensAfter =
       input.tokensAfter ??
-      estimateTokens(contextSummary) + estimateTokensForMessages(keptMessages);
+      (input.providerState === undefined
+        ? estimateTokens(contextSummary)
+        : estimateProviderState(input.providerState.items)) + estimateTokensForMessages(keptMessages);
     const keptUserMessageCount =
-      input.keptUserMessageCount ?? selection.head.length + selection.tail.length;
+      input.keptUserMessageCount ??
+      (nativeTail === undefined ? selection.head.length + selection.tail.length : nativeTail.length);
     const keptHeadUserMessageCount =
       input.keptHeadUserMessageCount ?? (selection.elided ? selection.head.length : undefined);
     const result: CompactionResult = {
@@ -371,6 +385,7 @@ export class ContextMemory {
       keptUserMessageCount,
       keptHeadUserMessageCount,
       droppedCount: input.droppedCount,
+      providerState: input.providerState,
     };
     this.agent.records.logRecord({
       type: 'context.apply_compaction',
@@ -390,9 +405,11 @@ export class ContextMemory {
     });
     const summaryMessage: ContextMessage = {
       role: 'user',
-      content: [{ type: 'text', text: contextSummary }],
+      content:
+        input.providerState === undefined ? [{ type: 'text', text: contextSummary }] : [],
       toolCalls: [],
       origin: { kind: 'compaction_summary' },
+      providerState: input.providerState,
     };
     // Wire backward-compat: a pre-rework `context.apply_compaction` record (which
     // has no `keptUserMessageCount`) used `[summary, ...history.slice(compactedCount)]`
@@ -412,9 +429,11 @@ export class ContextMemory {
       this.agent.records.restoring !== null &&
       input.keptUserMessageCount === undefined &&
       input.compactedCount < this._history.length;
-    this._history = isLegacyRestore
-      ? [summaryMessage, ...this._history.slice(input.compactedCount)]
-      : [...keptMessages, summaryMessage];
+    this._history = input.providerState !== undefined
+      ? [summaryMessage, ...keptMessages]
+      : isLegacyRestore
+        ? [summaryMessage, ...this._history.slice(input.compactedCount)]
+        : [...keptMessages, summaryMessage];
     this.openSteps.clear();
     this.pendingToolResultIds.clear();
     // Drop deferred messages (mostly injections/system reminders) instead of

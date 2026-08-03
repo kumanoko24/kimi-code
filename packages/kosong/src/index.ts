@@ -14,6 +14,7 @@ export type {
   ContentPart,
   ImageURLPart,
   Message,
+  ProviderState,
   Role,
   StreamedMessagePart,
   TextPart,

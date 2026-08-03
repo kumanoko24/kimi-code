@@ -370,6 +370,8 @@ function toKosongProviderConfig(
           modelBaseUrl ?? providerValue(provider.baseUrl, provider.env, 'OPENAI_BASE_URL'),
         apiKey: providerApiKey(provider),
         offEffort,
+        cacheKeyHeader: provider.cacheKeyHeader,
+        nativeCompaction: provider.nativeCompaction,
         // Session affinity: same `prompt_cache_key` intent as the `openai`
         // branch; the Responses API accepts it as a top-level request field.
         generationKwargs: { prompt_cache_key: promptCacheKey },

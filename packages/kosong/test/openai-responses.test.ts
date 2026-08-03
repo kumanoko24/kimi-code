@@ -950,6 +950,44 @@ describe('OpenAIResponsesChatProvider', () => {
       expect(provider.maxCompletionTokens).toBe(1024);
     });
 
+    it('omits the host fallback completion cap', async () => {
+      const original = createProvider();
+      const provider = original.withMaxCompletionTokens(258000, { mode: 'fallback' });
+      const body = await captureRequestBody(
+        provider,
+        '',
+        [],
+        [{ role: 'user', content: [{ type: 'text', text: 'Hi' }], toolCalls: [] }],
+      );
+
+      expect(provider).toBe(original);
+      expect(body).not.toHaveProperty('max_output_tokens');
+    });
+
+    it('sends the prompt cache key in both body and configured header', async () => {
+      const provider = new OpenAIResponsesChatProvider({
+        model: 'gpt-5.6-sol',
+        apiKey: 'test-key',
+        cacheKeyHeader: 'X-Session-ID',
+        generationKwargs: { prompt_cache_key: 'session-test' },
+      });
+      (provider as any)._stream = false;
+      const create = vi.fn().mockResolvedValue(makeResponsesAPIResponse());
+      ((provider as any)._client.responses as Record<string, unknown>)['create'] = create;
+
+      const stream = await provider.generate(
+        '',
+        [],
+        [{ role: 'user', content: [{ type: 'text', text: 'Hi' }], toolCalls: [] }],
+      );
+      for await (const part of stream) void part;
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ prompt_cache_key: 'session-test' }),
+        { headers: { 'X-Session-ID': 'session-test' } },
+      );
+    });
+
     it('maps json_schema response format to text.format', async () => {
       const provider = createProvider();
       const history: Message[] = [
@@ -1017,6 +1055,74 @@ describe('OpenAIResponsesChatProvider', () => {
           description: undefined,
         },
       });
+    });
+  });
+
+  describe('native compaction', () => {
+    it('returns opaque compact output and replays it unchanged', async () => {
+      const compactOutput = [
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'opaque' }] },
+        { type: 'compaction_summary', encrypted_content: 'encrypted-test' },
+      ];
+      const provider = new OpenAIResponsesChatProvider({
+        model: 'gpt-5.6-sol',
+        apiKey: 'test-key',
+        cacheKeyHeader: 'X-Session-ID',
+        nativeCompaction: true,
+        generationKwargs: { prompt_cache_key: 'session-test' },
+      });
+      const compact = vi.fn().mockResolvedValue({
+        id: 'cmp_test',
+        object: 'response.compaction',
+        output: compactOutput,
+        usage: {
+          input_tokens: 20,
+          output_tokens: 7,
+          input_tokens_details: { cached_tokens: 5 },
+        },
+      });
+      ((provider as any)._client.responses as Record<string, unknown>)['compact'] = compact;
+
+      const result = await provider.compact!(
+        'system',
+        [{ role: 'user', content: [{ type: 'text', text: 'Hi' }], toolCalls: [] }],
+      );
+
+      expect(compact).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gpt-5.6-sol',
+          instructions: 'system',
+          prompt_cache_key: 'session-test',
+        }),
+        { headers: { 'X-Session-ID': 'session-test' } },
+      );
+      expect(result).toEqual({
+        id: 'cmp_test',
+        state: { protocol: 'openai_responses', items: compactOutput },
+        usage: { inputOther: 15, output: 7, inputCacheRead: 5, inputCacheCreation: 0 },
+      });
+
+      const body = await captureRequestBody(provider, '', [], [
+        {
+          role: 'user',
+          content: [],
+          toolCalls: [],
+          providerState: result.state,
+        },
+        { role: 'user', content: [{ type: 'text', text: 'After compact' }], toolCalls: [] },
+      ]);
+      expect(body['input']).toEqual([
+        ...compactOutput,
+        {
+          content: [{ type: 'input_text', text: 'After compact' }],
+          role: 'user',
+          type: 'message',
+        },
+      ]);
+    });
+
+    it('is absent unless explicitly enabled', () => {
+      expect(createProvider().compact).toBeUndefined();
     });
   });
 

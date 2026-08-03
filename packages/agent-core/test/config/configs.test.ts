@@ -151,6 +151,36 @@ claim_stale_after_ms = 15000
 `;
 
 describe('harness config TOML loader', () => {
+  it('parses OpenAI Responses cache-header and native-compaction options', () => {
+    const config = parseConfigString(
+      `
+[providers.local]
+type = "openai_responses"
+api_key = "test-key"
+base_url = "https://api.example.test/v1"
+cache_key_header = "X-Session-ID"
+native_compaction = true
+`,
+      'config.toml',
+    );
+
+    expect(config.providers['local']).toMatchObject({
+      type: 'openai_responses',
+      cacheKeyHeader: 'X-Session-ID',
+      nativeCompaction: true,
+    });
+    expect(() =>
+      parseConfigString(
+        `
+[providers.local]
+type = "openai_responses"
+cache_key_header = "bad header"
+`,
+        'config.toml',
+      ),
+    ).toThrow(/valid HTTP header name/);
+  });
+
   it('parses the current config.toml shape through explicit field mappings', () => {
     const config = parseConfigString(COMPLETE_TOML, 'config.toml');
 

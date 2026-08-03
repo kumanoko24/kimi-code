@@ -137,6 +137,7 @@ describe('applyCompletionBudget', () => {
     expect(withMaxCompletionTokens).toHaveBeenCalledOnce();
     const cap = withMaxCompletionTokens.mock.calls[0]?.[0] as number;
     expect(cap).toBe(10000);
+    expect(withMaxCompletionTokens.mock.calls[0]?.[1]).toMatchObject({ mode: 'fallback' });
     expect(result).not.toBe(original);
   });
 
@@ -148,6 +149,7 @@ describe('applyCompletionBudget', () => {
     });
     expect(withMaxCompletionTokens).toHaveBeenCalledOnce();
     expect(withMaxCompletionTokens.mock.calls[0]?.[0]).toBe(8192);
+    expect(withMaxCompletionTokens.mock.calls[0]?.[1]).toMatchObject({ mode: 'hard_cap' });
     expect(result).not.toBe(original);
   });
 });

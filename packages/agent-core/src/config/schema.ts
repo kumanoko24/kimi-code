@@ -23,6 +23,9 @@ export const OAuthRefSchema = z.object({
 export type OAuthRef = z.infer<typeof OAuthRefSchema>;
 
 const StringRecordSchema = z.record(z.string(), z.string());
+const HttpHeaderNameSchema = z
+  .string()
+  .regex(/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/, 'must be a valid HTTP header name');
 
 export const ProviderConfigSchema = z.object({
   type: ProviderTypeSchema,
@@ -32,6 +35,8 @@ export const ProviderConfigSchema = z.object({
   oauth: OAuthRefSchema.optional(),
   env: StringRecordSchema.optional(),
   customHeaders: StringRecordSchema.optional(),
+  cacheKeyHeader: HttpHeaderNameSchema.optional(),
+  nativeCompaction: z.boolean().optional(),
   source: z.record(z.string(), z.unknown()).optional(),
 });
 

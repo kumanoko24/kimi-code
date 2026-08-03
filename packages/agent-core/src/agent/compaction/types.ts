@@ -1,3 +1,5 @@
+import type { ProviderState } from '@moonshot-ai/kosong';
+
 export interface CompactionResult {
   /** Human-facing summary text produced by the compaction model. */
   summary: string;
@@ -40,6 +42,8 @@ export interface CompactionResult {
    * compatibility with older wire records.
    */
   droppedCount?: number;
+  /** Opaque provider-native context persisted for protocol-faithful replay. */
+  providerState?: ProviderState;
 }
 
 /**
@@ -52,7 +56,12 @@ export type CompactionInput = Pick<CompactionResult, 'summary' | 'compactedCount
   Partial<
     Pick<
       CompactionResult,
-      'contextSummary' | 'tokensAfter' | 'keptUserMessageCount' | 'keptHeadUserMessageCount' | 'droppedCount'
+      | 'contextSummary'
+      | 'tokensAfter'
+      | 'keptUserMessageCount'
+      | 'keptHeadUserMessageCount'
+      | 'droppedCount'
+      | 'providerState'
     >
   >;
 

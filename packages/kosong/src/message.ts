@@ -81,6 +81,12 @@ export interface ToolCallPart {
  */
 export type StreamedMessagePart = ContentPart | ToolCall | ToolCallPart;
 
+/** Opaque provider-native context that only its originating wire protocol may encode. */
+export interface ProviderState {
+  readonly protocol: string;
+  readonly items: readonly unknown[];
+}
+
 /**
  * A single message in a conversation.
  *
@@ -112,6 +118,8 @@ export interface Message {
    * a provider without that capability.
    */
   readonly tools?: readonly Tool[] | undefined;
+  /** Provider-native context produced by compaction; never render or reinterpret its items. */
+  readonly providerState?: ProviderState;
 }
 
 /** Check if a streamed part is a ContentPart (text, think, image_url, audio_url, video_url). */

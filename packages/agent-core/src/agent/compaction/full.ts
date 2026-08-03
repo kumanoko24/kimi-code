@@ -59,6 +59,7 @@ export const MAX_COMPACTION_RETRY_ATTEMPTS = 5;
 const DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS = 128 * 1024;
 const OVERFLOW_CONTEXT_SAFETY_RATIO = 0.85;
 const OVERFLOW_STATUS_RECOVERY_RATIO = 0.5;
+const NATIVE_COMPACTION_SUMMARY = 'OpenAI Responses native compaction state.';
 
 class CompactionTruncatedError extends Error {
   constructor() {
@@ -356,8 +357,13 @@ export class FullCompaction {
       // input replays (markCompleted), so only genuinely new content counts.
       this.lastCompactedTokenCount = this.tokenCountWithPending;
       this.markCompleted();
-      const { contextSummary: _contextSummary, ...eventResult } = result;
+      const {
+        contextSummary: _contextSummary,
+        providerState: _providerState,
+        ...eventResult
+      } = result;
       void _contextSummary;
+      void _providerState;
       this.agent.emitEvent({ type: 'compaction.completed', result: eventResult });
       this.triggerPostCompactHook(data, result);
     } catch (error) {
@@ -411,6 +417,15 @@ export class FullCompaction {
     this.activeSummarizerTrace = undefined;
     try {
       await this.triggerPreCompactHook(data, tokensBefore, signal);
+
+      const nativeResult = await this.tryNativeCompaction({
+        data,
+        originalHistory,
+        tokensBefore,
+        startedAt,
+        signal,
+      });
+      if (nativeResult !== undefined) return nativeResult;
 
       const model = this.agent.config.model;
       const capability = this.agent.config.modelCapabilities;
@@ -666,6 +681,93 @@ export class FullCompaction {
         throw error;
       throw new KimiError(ErrorCodes.COMPACTION_FAILED, String(error), { cause: error });
     }
+  }
+
+  private async tryNativeCompaction(input: {
+    readonly data: Readonly<CompactionBeginData>;
+    readonly originalHistory: readonly ContextMessage[];
+    readonly tokensBefore: number;
+    readonly startedAt: number;
+    readonly signal: AbortSignal;
+  }): Promise<CompactionResult | undefined> {
+    if (!this.agent.experimentalFlags.enabled('openai-responses-compaction')) return undefined;
+    const provider = this.agent.config.provider;
+    if (provider.compact === undefined) return undefined;
+
+    const customInstruction = input.data.instruction?.trim();
+    const systemPrompt =
+      customInstruction === undefined || customInstruction.length === 0
+        ? this.agent.config.systemPrompt
+        : `${this.agent.config.systemPrompt}\n\nCompaction preference:\n${customInstruction}`;
+    const messages = this.agent.context.project(
+      stripDynamicToolContext(input.originalHistory),
+      { synthesizeMissing: true, dropOrphanResults: true },
+    );
+    this.agent.log.info('native OpenAI Responses compaction started', {
+      model: provider.modelName,
+      protocol: 'openai_responses',
+      messageCount: messages.length,
+    });
+
+    const run = (auth?: import('@moonshot-ai/kosong').ProviderRequestAuth) =>
+      provider.compact!(systemPrompt, messages, { signal: input.signal, auth });
+    const modelAlias = this.agent.config.modelAlias;
+    const withAuth =
+      modelAlias === undefined
+        ? undefined
+        : this.agent.modelProvider?.resolveAuth?.(modelAlias, { log: this.agent.log });
+    const compacted = withAuth === undefined ? await run() : await withAuth(run);
+
+    const newHistory = this.agent.context.history;
+    for (let index = 0; index < input.originalHistory.length; index += 1) {
+      if (newHistory[index] !== input.originalHistory[index]) {
+        this.cancel();
+        return undefined;
+      }
+    }
+    if (
+      newHistory
+        .slice(input.originalHistory.length)
+        .some((message) => !isRealUserInput(message))
+    ) {
+      this.cancel();
+      return undefined;
+    }
+
+    this.agent.usage.record(this.agent.config.model, compacted.usage);
+    const appended = newHistory.slice(input.originalHistory.length);
+    const measuredTokens =
+      compacted.usage.output > 0
+        ? compacted.usage.output + estimateTokensForMessages(appended)
+        : undefined;
+    const result = this.agent.context.applyCompaction({
+      summary: NATIVE_COMPACTION_SUMMARY,
+      compactedCount: input.originalHistory.length,
+      tokensBefore: input.tokensBefore,
+      tokensAfter: measuredTokens,
+      providerState: compacted.state,
+    });
+    this.agent.telemetry.track('compaction_finished', {
+      source: input.data.source,
+      tokens_before: result.tokensBefore,
+      tokens_after: result.tokensAfter,
+      duration_ms: Date.now() - input.startedAt,
+      compacted_count: result.compactedCount,
+      retry_count: 0,
+      round: 1,
+      thinking_effort: this.agent.config.thinkingEffort,
+      input_tokens: inputTotal(compacted.usage),
+      output_tokens: compacted.usage.output,
+    });
+    this.agent.log.info('native OpenAI Responses compaction completed', {
+      model: provider.modelName,
+      protocol: compacted.state.protocol,
+      itemCount: compacted.state.items.length,
+      durationMs: Date.now() - input.startedAt,
+      inputTokens: inputTotal(compacted.usage),
+      outputTokens: compacted.usage.output,
+    });
+    return result;
   }
 
   private async triggerPreCompactHook(

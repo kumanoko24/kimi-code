@@ -24,7 +24,7 @@ import {
   DefaultCompactionStrategy,
   type CompactionStrategy,
 } from '../../../src/agent/compaction';
-import { FLAG_DEFINITIONS, MASTER_ENV } from '../../../src/flags';
+import { FLAG_DEFINITIONS, FlagResolver, MASTER_ENV } from '../../../src/flags';
 import { HookEngine, type HookEngineTriggerArgs } from '../../../src/session/hooks';
 import { estimateTokens, estimateTokensForMessages } from '../../../src/utils/tokens';
 import { recordingTelemetry, type TelemetryRecord } from '../../fixtures/telemetry';
@@ -49,6 +49,68 @@ const CATALOGUED_MODEL_CAPABILITIES = {
 const MICRO_COMPACTION_FLAG_ENV = getMicroCompactionFlagEnv();
 
 describe('FullCompaction', () => {
+  it('uses native OpenAI Responses compaction and persists only opaque provider state', async () => {
+    const compactOutput = [
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'opaque' }] },
+      { type: 'compaction_summary', encrypted_content: 'encrypted-test' },
+    ];
+    const ctx = testAgent({
+      experimentalFlags: new FlagResolver({}, FLAG_DEFINITIONS, {
+        'openai-responses-compaction': true,
+      }),
+    });
+    ctx.configure({
+      provider: {
+        type: 'openai_responses',
+        apiKey: 'test-key',
+        model: 'gpt-5.6-sol',
+        nativeCompaction: true,
+        cacheKeyHeader: 'X-Session-ID',
+      },
+      modelCapabilities: CATALOGUED_MODEL_CAPABILITIES,
+    });
+    ctx.appendExchange(1, 'old user', 'old assistant', 20);
+    const compact = vi.fn().mockResolvedValue({
+      id: 'cmp_test',
+      object: 'response.compaction',
+      output: compactOutput,
+      usage: { input_tokens: 20, output_tokens: 7 },
+    });
+    const provider = ctx.agent.config.provider as unknown as {
+      _client: { responses: Record<string, unknown> };
+    };
+    provider._client.responses['compact'] = compact;
+
+    await ctx.rpc.beginCompaction({});
+    await ctx.once('compaction.completed');
+
+    expect(compact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gpt-5.6-sol',
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(ctx.agent.context.history).toEqual([
+      expect.objectContaining({
+        role: 'user',
+        content: [],
+        providerState: { protocol: 'openai_responses', items: compactOutput },
+        origin: { kind: 'compaction_summary' },
+      }),
+    ]);
+    const completedEvent = ctx.allEvents.find((entry) => entry.event === 'compaction.completed');
+    expect(completedEvent?.args).toEqual({
+      result: expect.objectContaining({
+        summary: 'OpenAI Responses native compaction state.',
+        tokensAfter: 7,
+      }),
+    });
+    expect(completedEvent?.args).not.toEqual({
+      result: expect.objectContaining({ providerState: expect.anything() }),
+    });
+    await ctx.expectResumeMatches();
+  });
+
   it('runs manual compaction and applies the compacted context', async () => {
     const records: TelemetryRecord[] = [];
     const ctx = testAgent({ telemetry: recordingTelemetry(records) });

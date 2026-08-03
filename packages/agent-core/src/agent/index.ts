@@ -6,7 +6,7 @@ import { ErrorCodes, KimiError, makeErrorPayload } from '#/errors';
 import { log } from '#/logging/logger';
 import type { Logger } from '#/logging/types';
 import type { AgentAPI, AgentEvent, KimiConfig, SDKAgentRPC, UsageStatus } from '#/rpc';
-import { generate, type ChatProvider } from '@moonshot-ai/kosong';
+import { ChatProviderError, generate, type ChatProvider } from '@moonshot-ai/kosong';
 
 import type { EnabledPluginSessionStart, EnabledPluginSystemPrompt, PluginCommandDef } from '#/plugin';
 import { expandCommandArguments } from '../plugin/commands';
@@ -287,6 +287,16 @@ export class Agent {
 
   get generate(): typeof generate {
     return async (provider, systemPrompt, tools, history, callbacks, options) => {
+      const incompatible = history.find(
+        (message) =>
+          message.providerState !== undefined &&
+          message.providerState.protocol !== provider.name.replaceAll('-', '_'),
+      );
+      if (incompatible?.providerState !== undefined) {
+        throw new ChatProviderError(
+          `Provider-native context for protocol "${incompatible.providerState.protocol}" cannot be sent through "${provider.name}". Start a new session or switch back to the original protocol.`,
+        );
+      }
       const { requestLogFields, generateOptions } = splitGenerateOptions(options);
       const modelAlias = this.config.modelAlias;
       const run = (requestOptions: Parameters<typeof generate>[5]) => {

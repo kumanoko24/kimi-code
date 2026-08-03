@@ -424,6 +424,7 @@ function prepareMessageForProjection(
   // content-free — it must survive the empty-message cleanup or the loaded
   // schemas silently vanish from every outgoing request.
   if (next.tools !== undefined && next.tools.length > 0) return next;
+  if (next.providerState !== undefined) return next;
   if (next.toolCalls.length > 0) return next;
   if (next.content.length === 0) return null;
   // Every remaining part serializes to nothing on the wire — e.g. an
@@ -491,6 +492,7 @@ function stripContextMetadata(message: ContextMessage): Message {
     toolCallId: message.toolCallId,
     partial: message.partial,
     tools: message.tools?.map((tool) => ({ ...tool })),
+    providerState: message.providerState,
   };
 }
 

@@ -870,6 +870,8 @@ describe('resolveRuntimeProvider customHeaders propagation', () => {
             type: 'openai_responses',
             apiKey: 'sk-openai',
             customHeaders: { 'X-Custom': 'value' },
+            cacheKeyHeader: 'X-Session-ID',
+            nativeCompaction: true,
           },
         },
         models: {
@@ -885,6 +887,8 @@ describe('resolveRuntimeProvider customHeaders propagation', () => {
     expect(resolved.provider).toMatchObject({
       type: 'openai_responses',
       defaultHeaders: { 'X-Custom': 'value' },
+      cacheKeyHeader: 'X-Session-ID',
+      nativeCompaction: true,
     });
   });
 

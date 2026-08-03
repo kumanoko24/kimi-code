@@ -12,6 +12,7 @@ interface TokenEstimatableMessage {
   readonly content: readonly ContentPart[];
   readonly toolCalls?: readonly { readonly name: string; readonly arguments: unknown }[];
   readonly tools?: readonly Tool[] | undefined;
+  readonly providerState?: { readonly items: readonly unknown[] };
 }
 
 const messageTokenEstimateCache = new WeakMap<TokenEstimatableMessage, number>();
@@ -74,6 +75,13 @@ export function estimateTokensForMessage(message: TokenEstimatableMessage): numb
   // overflows before compaction ever triggers.
   if (message.tools !== undefined) {
     total += estimateTokensForTools(message.tools);
+  }
+  if (message.providerState !== undefined) {
+    try {
+      total += estimateTokens(JSON.stringify(message.providerState.items));
+    } catch {
+      // Opaque provider state that cannot be serialized contributes no estimate.
+    }
   }
   messageTokenEstimateCache.set(message, total);
   return total;

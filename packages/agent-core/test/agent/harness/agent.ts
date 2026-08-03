@@ -1083,6 +1083,8 @@ function providerConfigForAlias(provider: ProviderConfig): KimiConfig['providers
     type: provider.type,
     apiKey: 'apiKey' in provider ? provider.apiKey : undefined,
     baseUrl: 'baseUrl' in provider ? provider.baseUrl : undefined,
+    cacheKeyHeader: 'cacheKeyHeader' in provider ? provider.cacheKeyHeader : undefined,
+    nativeCompaction: 'nativeCompaction' in provider ? provider.nativeCompaction : undefined,
   };
 }
 

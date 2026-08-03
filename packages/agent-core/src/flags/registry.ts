@@ -41,6 +41,15 @@ export const FLAG_DEFINITIONS = [
     default: false,
     surface: 'core',
   },
+  {
+    id: 'openai-responses-compaction',
+    title: 'OpenAI Responses native compaction',
+    description:
+      'Use the OpenAI Responses compact endpoint and replay its opaque provider-native context unchanged.',
+    env: 'KIMI_CODE_EXPERIMENTAL_OPENAI_RESPONSES_COMPACTION',
+    default: false,
+    surface: 'core',
+  },
 ] as const satisfies readonly FlagDefinitionInput[];
 
 /** Literal union of registered flag ids. */

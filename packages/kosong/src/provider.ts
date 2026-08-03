@@ -1,4 +1,4 @@
-import type { Message, StreamedMessagePart, VideoURLPart } from './message';
+import type { Message, ProviderState, StreamedMessagePart, VideoURLPart } from './message';
 import type { Tool } from './tool';
 import type { TokenUsage } from './usage';
 
@@ -50,6 +50,14 @@ export interface MaxCompletionTokensOptions {
   readonly usedContextTokens?: number;
   /** Model context-window size in tokens (`max_context_size`). */
   readonly maxContextTokens?: number;
+  /** Distinguishes an explicit cap from the host's conservative fallback. */
+  readonly mode?: 'hard_cap' | 'fallback';
+}
+
+export interface ProviderCompactionResult {
+  readonly state: ProviderState;
+  readonly usage: TokenUsage;
+  readonly id?: string;
 }
 
 /**
@@ -249,6 +257,12 @@ export interface ChatProvider {
     history: Message[],
     options?: GenerateOptions,
   ): Promise<StreamedMessage>;
+  /** Compact a conversation using the provider's native protocol, when supported. */
+  compact?(
+    systemPrompt: string,
+    history: Message[],
+    options?: GenerateOptions,
+  ): Promise<ProviderCompactionResult>;
   /** Return a shallow copy of this provider with the given thinking effort. */
   withThinking(effort: ThinkingEffort): ChatProvider;
   /**

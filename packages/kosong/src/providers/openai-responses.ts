@@ -11,6 +11,8 @@ import type {
   ChatProvider,
   FinishReason,
   GenerateOptions,
+  MaxCompletionTokensOptions,
+  ProviderCompactionResult,
   ProviderRequestAuth,
   ResponseFormat,
   StreamedMessage,
@@ -78,6 +80,7 @@ function normalizeResponsesFinishReason(
 }
 
 type RawObject = Record<string, unknown>;
+const OPENAI_RESPONSES_PROTOCOL = 'openai_responses';
 const OPENAI_RESPONSES_TOOL_CALL_ID_POLICY: ToolCallIdPolicy = {
   normalize: (id) => sanitizeOpenAIResponsesCallId(id, 64),
   maxLength: 64,
@@ -363,6 +366,10 @@ export interface OpenAIResponsesOptions {
   offEffort?: string | undefined;
   httpClient?: unknown;
   defaultHeaders?: Record<string, string>;
+  /** Dynamic request header populated with the same per-session prompt cache key. */
+  cacheKeyHeader?: string | undefined;
+  /** Enables POST /v1/responses/compact for full compaction. */
+  nativeCompaction?: boolean | undefined;
   toolMessageConversion?: ToolMessageConversion | undefined;
   clientFactory?: (auth: ProviderRequestAuth) => OpenAI;
   /**
@@ -660,6 +667,16 @@ function convertHistoryMessages(
   };
 
   for (const msg of history) {
+    if (msg.providerState !== undefined) {
+      if (msg.providerState.protocol !== OPENAI_RESPONSES_PROTOCOL) {
+        throw new ChatProviderError(
+          `OpenAI Responses cannot encode provider state from protocol "${msg.providerState.protocol}".`,
+        );
+      }
+      flushPendingMedia();
+      input.push(...msg.providerState.items);
+      continue;
+    }
     // Message-level tool declarations are a Kimi wire feature; skipped here
     // because the leftover content-free message item is rejected by the
     // Responses API. See isToolDeclarationOnlyMessage.
@@ -723,16 +740,7 @@ export class OpenAIResponsesStreamedMessage implements StreamedMessage {
   }
 
   private _extractUsage(usage: RawObject): void {
-    const inputTokens = readNumberField(usage, 'input_tokens') ?? 0;
-    const outputTokens = readNumberField(usage, 'output_tokens') ?? 0;
-    const details = readObjectField(usage, 'input_tokens_details');
-    const cached = details ? (readNumberField(details, 'cached_tokens') ?? 0) : 0;
-    this._usage = {
-      inputOther: inputTokens - cached,
-      output: outputTokens,
-      inputCacheRead: cached,
-      inputCacheCreation: 0,
-    };
+    this._usage = decodeResponsesUsage(usage);
   }
 
   private async *_convertNonStreamResponse(
@@ -1048,18 +1056,21 @@ export class OpenAIResponsesChatProvider implements ChatProvider {
   private _apiKey: string | undefined;
   private _baseUrl: string | undefined;
   private _defaultHeaders: Record<string, string> | undefined;
+  private _cacheKeyHeader: string | undefined;
   private _generationKwargs: OpenAIResponsesGenerationKwargs;
   private _offEffort: string | undefined;
   private _toolMessageConversion: ToolMessageConversion;
   private _client: OpenAI | undefined;
   private _httpClient: unknown;
   private _clientFactory: ((auth: ProviderRequestAuth) => OpenAI) | undefined;
+  readonly compact?: ChatProvider['compact'];
 
   constructor(options: OpenAIResponsesOptions) {
     const apiKey = options.apiKey ?? process.env['OPENAI_API_KEY'];
     this._apiKey = apiKey === undefined || apiKey.length === 0 ? undefined : apiKey;
     this._baseUrl = options.baseUrl ?? 'https://api.openai.com/v1';
     this._defaultHeaders = options.defaultHeaders;
+    this._cacheKeyHeader = options.cacheKeyHeader;
     this._model = options.model;
     this._stream = true; // Responses API always supports streaming
     this._generationKwargs = { ...options.generationKwargs };
@@ -1067,6 +1078,9 @@ export class OpenAIResponsesChatProvider implements ChatProvider {
     this._toolMessageConversion = options.toolMessageConversion ?? null;
     this._httpClient = options.httpClient;
     this._clientFactory = options.clientFactory;
+    if (options.nativeCompaction === true) {
+      this.compact = this._compact.bind(this);
+    }
 
     if (options.maxOutputTokens !== undefined) {
       this._generationKwargs.max_output_tokens = options.maxOutputTokens;
@@ -1163,7 +1177,7 @@ export class OpenAIResponsesChatProvider implements ChatProvider {
         client.responses as {
           create(params: unknown, opts?: unknown): Promise<unknown>;
         }
-      ).create(createParams, options?.signal ? { signal: options.signal } : undefined);
+      ).create(createParams, this._requestOptions(options));
       return new OpenAIResponsesStreamedMessage(response, this._stream);
     } catch (error: unknown) {
       throw convertOpenAIError(error);
@@ -1189,8 +1203,81 @@ export class OpenAIResponsesChatProvider implements ChatProvider {
     return clone;
   }
 
-  withMaxCompletionTokens(maxCompletionTokens: number): OpenAIResponsesChatProvider {
+  withMaxCompletionTokens(
+    maxCompletionTokens: number,
+    options?: MaxCompletionTokensOptions,
+  ): OpenAIResponsesChatProvider {
+    if (options?.mode === 'fallback') return this;
     return this.withGenerationKwargs({ max_output_tokens: maxCompletionTokens });
+  }
+
+  private async _compact(
+    systemPrompt: string,
+    history: Message[],
+    options?: GenerateOptions,
+  ): Promise<ProviderCompactionResult> {
+    const input = convertHistoryMessages(
+      normalizeToolCallIdsForProvider(history, OPENAI_RESPONSES_TOOL_CALL_ID_POLICY),
+      this._model,
+      this._toolMessageConversion,
+    );
+    const params: Record<string, unknown> = {
+      model: this._model,
+      input,
+      instructions: systemPrompt || undefined,
+      prompt_cache_key: this._generationKwargs['prompt_cache_key'],
+    };
+    for (const key of Object.keys(params)) {
+      if (params[key] === undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+        delete params[key];
+      }
+    }
+
+    try {
+      const client = this._createClient(options?.auth);
+      if (
+        !('responses' in client) ||
+        typeof (client as { responses?: { compact?: unknown } }).responses?.compact !== 'function'
+      ) {
+        throw new ChatProviderError(
+          'OpenAI SDK version does not support Responses compaction. Upgrade the OpenAI SDK.',
+        );
+      }
+      options?.onRequestSent?.();
+      const raw = await (
+        client.responses as {
+          compact(params: unknown, opts?: unknown): Promise<unknown>;
+        }
+      ).compact(params, this._requestOptions(options));
+      const response = asRawObject(raw);
+      if (response === null || response['object'] !== 'response.compaction') {
+        failResponsesDecode('response.compaction', 'must have object="response.compaction".');
+      }
+      const id = requireStringField(response, 'id', 'response.compaction');
+      const output = response['output'];
+      if (!Array.isArray(output) || output.some((item) => asRawObject(item) === null)) {
+        failResponsesDecode('response.compaction.output', 'must be an array of objects.');
+      }
+      const usage = requireObjectField(response, 'usage', 'response.compaction');
+      return {
+        id,
+        state: { protocol: OPENAI_RESPONSES_PROTOCOL, items: output },
+        usage: decodeResponsesUsage(usage),
+      };
+    } catch (error: unknown) {
+      throw convertOpenAIError(error);
+    }
+  }
+
+  private _requestOptions(options: GenerateOptions | undefined): Record<string, unknown> | undefined {
+    const requestOptions: Record<string, unknown> = {};
+    if (options?.signal !== undefined) requestOptions['signal'] = options.signal;
+    const cacheKey = this._generationKwargs['prompt_cache_key'];
+    if (this._cacheKeyHeader !== undefined && typeof cacheKey === 'string') {
+      requestOptions['headers'] = { [this._cacheKeyHeader]: cacheKey };
+    }
+    return Object.keys(requestOptions).length === 0 ? undefined : requestOptions;
   }
 
   private _clone(): OpenAIResponsesChatProvider {
@@ -1225,4 +1312,17 @@ export class OpenAIResponsesChatProvider implements ChatProvider {
     }
     return new OpenAI(clientOpts as ConstructorParameters<typeof OpenAI>[0]);
   }
+}
+
+function decodeResponsesUsage(usage: RawObject): TokenUsage {
+  const inputTokens = readNumberField(usage, 'input_tokens') ?? 0;
+  const outputTokens = readNumberField(usage, 'output_tokens') ?? 0;
+  const details = readObjectField(usage, 'input_tokens_details');
+  const cached = details ? (readNumberField(details, 'cached_tokens') ?? 0) : 0;
+  return {
+    inputOther: Math.max(0, inputTokens - cached),
+    output: outputTokens,
+    inputCacheRead: cached,
+    inputCacheCreation: 0,
+  };
 }
