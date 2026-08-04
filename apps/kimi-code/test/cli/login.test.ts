@@ -85,6 +85,30 @@ describe('kimi login', () => {
     expect(exitSpy).toHaveBeenCalledWith(0);
   });
 
+  it('passes isolated runtime and auth homes to the login harness', async () => {
+    const previousHome = process.env['KIMI_CODE_HOME'];
+    const previousAuthHome = process.env['KIMI_CODE_AUTH_HOME'];
+    process.env['KIMI_CODE_HOME'] = '/tmp/kimi-runtime-home';
+    process.env['KIMI_CODE_AUTH_HOME'] = '/tmp/kimi-auth-home';
+    mockLogin.mockResolvedValue({ providerName: 'kimi-code', ok: true });
+
+    try {
+      const program = new Command('kimi').exitOverride();
+      registerLoginCommand(program);
+
+      await expect(program.parseAsync(['node', 'kimi', 'login'])).rejects.toThrow(ExitCalled);
+      expect(createKimiHarness).toHaveBeenCalledWith(expect.objectContaining({
+        homeDir: '/tmp/kimi-runtime-home',
+        authHomeDir: '/tmp/kimi-auth-home',
+      }));
+    } finally {
+      if (previousHome === undefined) delete process.env['KIMI_CODE_HOME'];
+      else process.env['KIMI_CODE_HOME'] = previousHome;
+      if (previousAuthHome === undefined) delete process.env['KIMI_CODE_AUTH_HOME'];
+      else process.env['KIMI_CODE_AUTH_HOME'] = previousAuthHome;
+    }
+  });
+
   it('prints device code prompt to stderr', async () => {
     mockLogin.mockImplementation(
       async (

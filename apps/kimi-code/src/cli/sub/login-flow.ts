@@ -8,12 +8,15 @@
 import { createKimiHarness } from '@moonshot-ai/kimi-code-sdk';
 
 import { createKimiCodeHostIdentity } from '#/cli/version';
+import { getAuthHomeDir, getDataDir } from '#/utils/paths';
 import { openUrl } from '#/utils/open-url';
 
 export async function runLoginFlow(): Promise<never> {
   const identity = createKimiCodeHostIdentity();
   const harness = createKimiHarness({
     identity,
+    homeDir: getDataDir(),
+    authHomeDir: getAuthHomeDir(),
     uiMode: 'cli',
   });
   const controller = new AbortController();
