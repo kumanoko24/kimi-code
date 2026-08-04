@@ -66,6 +66,28 @@ describe('KimiHarness.auth', () => {
     await expect(harness.auth.getCachedAccessToken()).resolves.toBe('oauth-access-token');
   });
 
+  it('reads a cached access token from a separate auth home', async () => {
+    const authHomeDir = join(homeDir, 'canonical');
+    await new FileTokenStorage(join(authHomeDir, 'credentials')).save('kimi-code', freshToken());
+    const harness = createKimiHarness({ homeDir, authHomeDir, identity: TEST_IDENTITY });
+
+    await expect(harness.auth.getCachedAccessToken()).resolves.toBe('oauth-access-token');
+  });
+
+  it('does not delete credentials from a separate auth home', async () => {
+    const authHomeDir = join(homeDir, 'canonical');
+    const storage = new FileTokenStorage(join(authHomeDir, 'credentials'));
+    await storage.save('kimi-code', freshToken());
+    const harness = createKimiHarness({ homeDir, authHomeDir, identity: TEST_IDENTITY });
+
+    await expect(harness.auth.logout()).rejects.toMatchObject({
+      code: ErrorCodes.AUTH_CREDENTIALS_READ_ONLY,
+    });
+    await expect(storage.load('kimi-code')).resolves.toMatchObject({
+      accessToken: 'oauth-access-token',
+    });
+  });
+
   it('maps missing runtime OAuth tokens to login-required errors', async () => {
     const harness = createKimiHarness({ homeDir, identity: TEST_IDENTITY });
 

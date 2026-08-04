@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import {
   KIMI_CODE_BANNER_DIR_NAME,
   KIMI_CODE_BANNER_STATE_FILE_NAME,
+  KIMI_CODE_AUTH_HOME_ENV,
   KIMI_CODE_BIN_DIR_NAME,
   KIMI_CODE_CACHE_DIR_NAME,
   KIMI_CODE_DATA_DIR_NAME,
@@ -42,7 +43,14 @@ export function getDataDir(): string {
 
 /** Return the optional primary session home selected by an embedding host. */
 export function getSessionHomeDir(): string | undefined {
-  return process.env[KIMI_CODE_SESSION_HOME_ENV] || undefined;
+  const homeDir = process.env[KIMI_CODE_SESSION_HOME_ENV];
+  return homeDir === '' ? undefined : homeDir;
+}
+
+/** Return the optional read-only OAuth credential home selected by an embedding host. */
+export function getAuthHomeDir(): string | undefined {
+  const homeDir = process.env[KIMI_CODE_AUTH_HOME_ENV];
+  return homeDir === '' ? undefined : homeDir;
 }
 
 /**

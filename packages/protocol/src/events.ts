@@ -260,6 +260,7 @@ export type KimiErrorCode =
   | 'profile.not_bound'
   | 'model.not_found'
   | 'auth.login_required'
+  | 'auth.credentials_read_only'
   | 'auth.provisioning_required'
   | 'auth.token_missing'
   | 'auth.token_unauthorized'
@@ -1218,6 +1219,7 @@ export const kimiErrorCodeSchema = z.enum([
   'profile.not_bound',
   'model.not_found',
   'auth.login_required',
+  'auth.credentials_read_only',
   'auth.provisioning_required',
   'auth.token_missing',
   'auth.token_unauthorized',

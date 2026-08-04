@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-05T05:18:35+08:00`
+- updated_at: `2026-08-05T05:21:58+08:00`
 - objective: retain native OpenAI Responses support while syncing upstream and adding isolated `kiminn` session/OAuth interoperability
-- current milestone: M6b — shared OAuth and Kimi Coding Plan models
-- status: IN PROGRESS (`M6a` PASS; `M6b` pending)
+- current milestone: M6c — isolated rebuild, config, and real RBV
+- status: IN PROGRESS (`M6a` and `M6b` PASS; `M6c` pending)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -165,6 +165,28 @@ Evidence:
 - a composite session-store mechanism is activated only by the SDK's optional `sessionHomeDir`; without it, the original single-home code path remains unchanged;
 - public-harness contract tests prove canonical-home creation/discovery, fallback-home resume, origin-bound rename, duplicate-ID `session.storage_conflict`, and v2 fail-closed behavior;
 - protocol, agent-core, SDK, and CLI typechecks passed; 39 SDK tests and 32 CLI tests passed; changed-file lint has zero errors (unrelated pre-existing warnings remain in untouched lines).
+
+### M6b — shared OAuth mechanism (PASS)
+
+Verified at `2026-08-05 05:21 UTC+8`.
+
+Success criteria:
+
+- an explicitly configured v1 host can resolve managed Kimi OAuth from another Kimi home while retaining its own config/default model;
+- shared OAuth is usable for status, refresh, usage, and model requests without copying credentials;
+- explicit login/logout from the borrowing host cannot delete or reprovision the credential owner's account;
+- the existing `~/.kimi-code` path and default behavior remain unchanged when no auth-home override is supplied;
+- contract tests and typechecks pass before the mechanism checkpoint.
+
+Recovery boundary: remove `KIMI_CODE_AUTH_HOME` from the isolated wrapper and revert the M6b checkpoint. The implementation does not copy or rewrite the canonical credential file.
+
+Evidence:
+
+- the optional SDK `authHomeDir` selects the OAuth toolkit's credential root while `configPath` remains under the isolated runtime home;
+- borrowing clients reject `/login` and `/logout` with public error `auth.credentials_read_only`; refresh writes remain in the canonical OAuth store so normal token rotation continues to work;
+- v2 rejects a distinct auth home explicitly because its engine-owned auth service cannot yet honor this split;
+- live inventory found canonical file-backed OAuth under `~/.kimi-code/credentials` with mode `0600`; no credential content was printed;
+- protocol, agent-core, SDK, and CLI typechecks passed; 43 focused SDK tests and 34 CLI tests passed.
 
 Local recovery:
 

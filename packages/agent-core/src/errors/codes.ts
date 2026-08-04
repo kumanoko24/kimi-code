@@ -46,6 +46,7 @@ export const ErrorCodes = {
   MODEL_NOT_CONFIGURED: 'model.not_configured',
   MODEL_CONFIG_INVALID: 'model.config_invalid',
   AUTH_LOGIN_REQUIRED: 'auth.login_required',
+  AUTH_CREDENTIALS_READ_ONLY: 'auth.credentials_read_only',
 
   CONTEXT_OVERFLOW: 'context.overflow',
   LOOP_MAX_STEPS_EXCEEDED: 'loop.max_steps_exceeded',
@@ -297,6 +298,12 @@ export const KIMI_ERROR_INFO = {
     retryable: false,
     public: true,
     action: 'Run the login flow for the provider before retrying.',
+  },
+  'auth.credentials_read_only': {
+    title: 'Shared credentials are read-only',
+    retryable: false,
+    public: true,
+    action: 'Use the credential-owning Kimi Code installation to log in or out.',
   },
 
   'context.overflow': {

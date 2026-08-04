@@ -318,6 +318,7 @@ import { SessionEventWiring } from '#/v2/session-wiring';
 
 export interface SDKRpcClientV2Options {
   readonly homeDir?: string;
+  readonly authHomeDir?: string;
   readonly sessionHomeDir?: string;
   readonly configPath?: string;
   readonly identity?: KimiHostIdentity;
@@ -408,6 +409,15 @@ export class SDKRpcClientV2 extends SDKRpcClientBase {
     this.identity =
       options.identity === undefined ? undefined : assertKimiHostIdentity(options.identity);
     this.homeDir = resolveKimiHome(options.homeDir);
+    if (
+      options.authHomeDir !== undefined &&
+      resolveKimiHome(options.authHomeDir) !== this.homeDir
+    ) {
+      throw new KimiError(
+        ErrorCodes.CONFIG_INVALID,
+        'authHomeDir is supported only by the v1 session engine',
+      );
+    }
     if (
       options.sessionHomeDir !== undefined &&
       resolveKimiHome(options.sessionHomeDir) !== this.homeDir

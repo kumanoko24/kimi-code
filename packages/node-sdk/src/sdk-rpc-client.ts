@@ -31,6 +31,7 @@ import type {
 
 export interface SDKRpcClientOptions {
   readonly homeDir?: string;
+  readonly authHomeDir?: string;
   readonly sessionHomeDir?: string;
   readonly configPath?: string;
   readonly identity?: KimiHostIdentity;
@@ -65,10 +66,12 @@ export class SDKRpcClient extends SDKRpcClientBase {
       homeDir: this.homeDir,
       configPath: options.configPath,
     });
+    const authHomeDir = resolveKimiHome(options.authHomeDir ?? this.homeDir);
     this.telemetry = options.telemetry ?? noopTelemetryClient;
     this.auth = new KimiAuthFacade({
-      homeDir: this.homeDir,
+      homeDir: authHomeDir,
       configPath: this.configPath,
+      credentialsReadOnly: authHomeDir !== this.homeDir,
       identity: this.identity,
       onRefresh: options.onOAuthRefresh,
     });

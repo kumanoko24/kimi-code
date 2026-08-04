@@ -1,4 +1,6 @@
 import {
+  ErrorCodes,
+  KimiError,
   loadRuntimeConfigSafe,
   readConfigFile,
   readConfigFileForUpdate,
@@ -89,6 +91,7 @@ export interface KimiAuthLogoutResult {
 export interface KimiAuthFacadeOptions {
   readonly homeDir: string;
   readonly configPath: string;
+  readonly credentialsReadOnly?: boolean;
   readonly identity?: KimiHostIdentity | undefined;
   readonly onConfigUpdated?: ((config: KimiConfig) => void) | undefined;
   readonly onRefresh?: ((outcome: OAuthRefreshOutcome) => void) | undefined;
@@ -126,6 +129,7 @@ export class KimiAuthFacade {
     providerName: string | undefined = KIMI_CODE_PROVIDER_NAME,
     options: KimiAuthLoginOptions = {},
   ): Promise<KimiAuthLoginResult> {
+    this.assertCredentialsWritable();
     const auth = this.resolveManagedAuth(providerName);
     const loginAuth = resolveKimiCodeLoginAuth({
       configuredBaseUrl: auth.baseUrl,
@@ -155,6 +159,7 @@ export class KimiAuthFacade {
   }
 
   async logout(providerName?: string | undefined): Promise<KimiAuthLogoutResult> {
+    this.assertCredentialsWritable();
     const result = await this.toolkit.logout(
       providerName,
       this.resolveRuntimeManagedAuth(providerName).oauthRef,
@@ -292,6 +297,14 @@ export class KimiAuthFacade {
       oauthRef: provider?.oauth,
       baseUrl: provider?.baseUrl,
     };
+  }
+
+  private assertCredentialsWritable(): void {
+    if (this.options.credentialsReadOnly !== true) return;
+    throw new KimiError(
+      ErrorCodes.AUTH_CREDENTIALS_READ_ONLY,
+      'This client reads credentials from another Kimi Code home and cannot modify them.',
+    );
   }
 
   private resolveRuntimeManagedAuth(providerName?: string | undefined): {

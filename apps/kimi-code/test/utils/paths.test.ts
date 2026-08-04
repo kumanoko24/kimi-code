@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   getBinDir,
+  getAuthHomeDir,
   getDataDir,
   getInputHistoryFile,
   getLogDir,
@@ -18,6 +19,7 @@ const originalEnv = { ...process.env };
 
 beforeEach(() => {
   delete process.env['KIMI_CODE_HOME'];
+  delete process.env['KIMI_CODE_AUTH_HOME'];
   delete process.env['KIMI_CODE_SESSION_HOME'];
 });
 afterEach(() => {
@@ -48,6 +50,17 @@ describe('getSessionHomeDir', () => {
   it('returns KIMI_CODE_SESSION_HOME when set', () => {
     process.env['KIMI_CODE_SESSION_HOME'] = '/tmp/kimi-shared-sessions';
     expect(getSessionHomeDir()).toBe('/tmp/kimi-shared-sessions');
+  });
+});
+
+describe('getAuthHomeDir', () => {
+  it('returns undefined when KIMI_CODE_AUTH_HOME is not set', () => {
+    expect(getAuthHomeDir()).toBeUndefined();
+  });
+
+  it('returns KIMI_CODE_AUTH_HOME when set', () => {
+    process.env['KIMI_CODE_AUTH_HOME'] = '/tmp/kimi-shared-auth';
+    expect(getAuthHomeDir()).toBe('/tmp/kimi-shared-auth');
   });
 });
 
