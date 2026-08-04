@@ -80,6 +80,7 @@ export function applyCompletionBudget(args: {
   readonly budget: CompletionBudgetConfig | undefined;
   readonly capability: ModelCapability | undefined;
   readonly usedContextTokens?: number;
+  readonly mode?: 'hard_cap' | 'fallback';
 }): ChatProvider {
   if (args.budget === undefined) return args.provider;
   if (args.provider.withMaxCompletionTokens === undefined) return args.provider;
@@ -90,6 +91,6 @@ export function applyCompletionBudget(args: {
   return args.provider.withMaxCompletionTokens(cap, {
     usedContextTokens: args.usedContextTokens,
     maxContextTokens: args.capability?.max_context_tokens,
-    mode: args.budget.hardCap === undefined ? 'fallback' : 'hard_cap',
+    mode: args.mode ?? (args.budget.hardCap === undefined ? 'fallback' : 'hard_cap'),
   });
 }

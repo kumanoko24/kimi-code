@@ -473,11 +473,17 @@ export class SessionSubagentHost {
     profile: ResolvedAgentProfile,
     modelChoice?: SubagentModelChoice,
   ): SubagentModelBinding {
+    const profileBinding =
+      this.session.experimentalFlags.enabled('agent-profile-model-binding') &&
+      profile.model !== undefined
+        ? { modelAlias: profile.model, thinkingEffort: profile.thinkingEffort }
+        : undefined;
     const binding = resolveSubagentBinding(
       this.session.kimiConfig,
       this.session.experimentalFlags,
       { modelAlias: parent.config.modelAlias, thinkingEffort: parent.config.thinkingEffort },
-      modelChoice ?? profile.modelPreference,
+      modelChoice ?? (profileBinding === undefined ? profile.modelPreference : undefined),
+      profileBinding,
     );
     if (binding.modelAlias !== undefined) {
       const providerManager = this.session.options.providerManager;

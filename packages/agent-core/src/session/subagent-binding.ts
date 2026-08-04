@@ -33,6 +33,11 @@ export interface SubagentModelBinding {
   readonly thinkingEffort?: string;
 }
 
+export interface AgentProfileModelBinding {
+  readonly modelAlias: string;
+  readonly thinkingEffort?: string;
+}
+
 export function resolveSecondaryModel(
   config: KimiConfig | undefined,
   flags: ExperimentalFlagResolver,
@@ -51,7 +56,11 @@ export function resolveSubagentBinding(
   flags: ExperimentalFlagResolver,
   own: { readonly modelAlias: string | undefined; readonly thinkingEffort: string },
   requested?: SubagentModelChoice,
+  profileBinding?: AgentProfileModelBinding,
 ): SubagentModelBinding {
+  if (requested === undefined && profileBinding !== undefined) {
+    return profileBinding;
+  }
   const secondary = resolveSecondaryModel(config, flags);
   if (requested !== 'primary' && secondary?.model !== undefined) {
     return {

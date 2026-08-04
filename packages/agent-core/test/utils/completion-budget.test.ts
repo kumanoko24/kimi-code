@@ -152,6 +152,18 @@ describe('applyCompletionBudget', () => {
     expect(withMaxCompletionTokens.mock.calls[0]?.[1]).toMatchObject({ mode: 'hard_cap' });
     expect(result).not.toBe(original);
   });
+
+  it('allows an internal default cap to remain provider-optional', () => {
+    applyCompletionBudget({
+      provider: original,
+      budget: { hardCap: 128 * 1024 },
+      capability: makeCapability(256000),
+      mode: 'fallback',
+    });
+
+    expect(withMaxCompletionTokens.mock.calls[0]?.[0]).toBe(128 * 1024);
+    expect(withMaxCompletionTokens.mock.calls[0]?.[1]).toMatchObject({ mode: 'fallback' });
+  });
 });
 
 describe('resolveCompletionBudget', () => {

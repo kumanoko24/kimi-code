@@ -195,7 +195,11 @@ export class AgentSwarmTool implements IAgentSwarmTool {
           this.config,
           this.flags,
           { modelAlias: own.modelAlias, thinkingLevel: own.thinkingLevel },
-          args.model ?? targetProfile.modelPreference,
+          args.model ??
+            (targetProfile.model === undefined ? targetProfile.modelPreference : undefined),
+          targetProfile.model === undefined
+            ? undefined
+            : { model: targetProfile.model, thinking: targetProfile.thinkingEffort },
         );
       }
     }

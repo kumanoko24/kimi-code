@@ -190,6 +190,8 @@ export class SessionAgentProfileCatalog {
         disallowedTools: profile.disallowedTools,
         subagents: profile.subagents,
         modelPreference: profile.modelPreference,
+        model: profile.model,
+        thinkingEffort: profile.thinkingEffort,
         prompt: profile.prompt,
         path: `<session-agent-profile:${profile.name}>`,
         source: profile.source ?? 'explicit',
@@ -406,6 +408,8 @@ export class SessionAgentProfileCatalog {
           profile.disallowedTools === undefined ? undefined : [...profile.disallowedTools],
         subagents: Object.keys(profile.subagents ?? {}),
         modelPreference: profile.modelPreference,
+        model: profile.model,
+        thinkingEffort: profile.thinkingEffort,
         prompt: definition.prompt,
         source: definition.source,
       }));

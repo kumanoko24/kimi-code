@@ -71,4 +71,8 @@ export interface ResolvedAgentProfile {
   whenToUse?: string;
   subagents?: Record<string, ResolvedAgentProfile>;
   modelPreference?: AgentModelPreference;
+  /** Exact model alias bound when this profile is spawned as a subagent. */
+  model?: string;
+  /** Exact thinking effort paired with {@link model}. */
+  thinkingEffort?: string;
 }

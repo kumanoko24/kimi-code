@@ -621,12 +621,14 @@ export class AgentLLMRequesterService implements IAgentLLMRequesterService {
     const turnConfig = this.resolveTurnConfig(overrides.source);
     const resolved = turnConfig?.resolved ?? this.profile.resolveModelContext();
     const baseParams = turnConfig?.params ?? this.profile.resolveRequestParams();
-    const budgetParams = completionBudgetParams({
+    const configuredMaxOutputSize = overrides.maxOutputSize ?? resolved.maxOutputSize;
+    const maxCompletionTokensCap =
+      this.config.get<ModelOverrides>('modelOverrides')?.maxCompletionTokens;
+    let budgetParams = completionBudgetParams({
       budget: resolveCompletionBudget({
-        maxOutputSize: overrides.maxOutputSize ?? resolved.maxOutputSize,
+        maxOutputSize: configuredMaxOutputSize ?? overrides.defaultMaxOutputSize,
         reservedContextSize: resolved.reservedContextSize,
-        maxCompletionTokensCap:
-          this.config.get<ModelOverrides>('modelOverrides')?.maxCompletionTokens,
+        maxCompletionTokensCap,
       }),
       capability: resolved.modelCapabilities,
       usedContextTokens:
@@ -634,6 +636,14 @@ export class AgentLLMRequesterService implements IAgentLLMRequesterService {
           ? this.tokenCounting.get().measured
           : undefined,
     });
+    if (
+      budgetParams !== undefined &&
+      overrides.defaultMaxOutputSize !== undefined &&
+      configuredMaxOutputSize === undefined &&
+      maxCompletionTokensCap === undefined
+    ) {
+      budgetParams = { ...budgetParams, maxCompletionTokensMode: 'fallback' };
+    }
     const requester = this.modelCatalog.getRequester(resolved.modelAlias);
 
     const messages = overrides.messages ?? this.context.get();

@@ -42,6 +42,15 @@ export const FLAG_DEFINITIONS = [
     surface: 'core',
   },
   {
+    id: 'agent-profile-model-binding',
+    title: 'Exact model binding in agent files',
+    description:
+      'Let file-defined subagent profiles bind an exact model alias and thinking effort.',
+    env: 'KIMI_CODE_EXPERIMENTAL_AGENT_PROFILE_MODEL_BINDING',
+    default: false,
+    surface: 'core',
+  },
+  {
     id: 'acp-v2',
     title: 'ACP server v2 (agent-core-v2 engine)',
     description:

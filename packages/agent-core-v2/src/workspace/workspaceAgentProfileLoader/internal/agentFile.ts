@@ -95,6 +95,22 @@ export function parseAgentFileText(options: ParseAgentFileOptions): AgentFileDef
   const subagents =
     rawSubagents?.length === 1 && rawSubagents[0] === '*' ? undefined : rawSubagents;
   const modelPreference = parseModelPreference(frontmatter['model_preference'], options.path);
+  const model = nonEmptyStringField(frontmatter['model'], 'model', options.path);
+  const thinkingEffort = nonEmptyStringField(
+    frontmatter['thinking_effort'],
+    'thinking_effort',
+    options.path,
+  );
+  if (modelPreference !== undefined && model !== undefined) {
+    throw new AgentFileParseError(
+      `Frontmatter fields "model_preference" and "model" in ${options.path} are mutually exclusive`,
+    );
+  }
+  if (thinkingEffort !== undefined && model === undefined) {
+    throw new AgentFileParseError(
+      `Frontmatter field "thinking_effort" in ${options.path} requires "model"`,
+    );
+  }
 
   const prompt = parsed.body.trim();
   if (prompt.length === 0) {
@@ -110,10 +126,26 @@ export function parseAgentFileText(options: ParseAgentFileOptions): AgentFileDef
     disallowedTools,
     subagents,
     modelPreference,
+    model,
+    thinkingEffort,
     prompt,
     path: options.path,
     source: options.source,
   };
+}
+
+function nonEmptyStringField(
+  value: unknown,
+  field: string,
+  filePath: string,
+): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new AgentFileParseError(
+      `Frontmatter field "${field}" in ${filePath} must be a non-empty string`,
+    );
+  }
+  return value.trim();
 }
 
 function parseModelPreference(

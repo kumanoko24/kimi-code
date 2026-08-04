@@ -111,6 +111,40 @@ describe('FullCompaction', () => {
     await ctx.expectResumeMatches();
   });
 
+  it('skips native compaction when a resumed-sized input already exceeds the model window', async () => {
+    const ctx = testAgent({
+      experimentalFlags: new FlagResolver({}, FLAG_DEFINITIONS, {
+        'openai-responses-compaction': true,
+      }),
+    });
+    ctx.configure({
+      provider: {
+        type: 'openai_responses',
+        apiKey: 'test-key',
+        model: 'gpt-5.6-sol',
+        nativeCompaction: true,
+      },
+      modelCapabilities: { ...CATALOGUED_MODEL_CAPABILITIES, max_context_tokens: 32 },
+    });
+    ctx.appendExchange(1, 'old user '.repeat(100), 'old assistant '.repeat(100), 20);
+    const compact = vi.fn();
+    const provider = ctx.agent.config.provider as unknown as {
+      _client: { responses: Record<string, unknown> };
+    };
+    provider._client.responses['compact'] = compact;
+    ctx.mockNextResponse({ type: 'text', text: 'Fallback summary.' });
+
+    await ctx.rpc.beginCompaction({});
+    await ctx.once('compaction.completed');
+
+    expect(compact).not.toHaveBeenCalled();
+    expect(ctx.compactHistory()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: expect.stringContaining('Fallback summary.') }),
+      ]),
+    );
+  });
+
   it('runs manual compaction and applies the compacted context', async () => {
     const records: TelemetryRecord[] = [];
     const ctx = testAgent({ telemetry: recordingTelemetry(records) });
@@ -2418,7 +2452,7 @@ describe('FullCompaction', () => {
     expect(compactionMaxCompletionTokens).toEqual([384000]);
   });
 
-  it('uses default 128k hardCap when maxOutputSize is not configured', async () => {
+  it('uses the default 128k provider-optional cap when maxOutputSize is not configured', async () => {
     let callCount = 0;
     const compactionMaxCompletionTokens: unknown[] = [];
     const generate: GenerateFn = async (provider, _system, _tools, _history, callbacks) => {

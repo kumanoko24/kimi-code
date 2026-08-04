@@ -12,6 +12,9 @@ import { type FlagDefinitionInput, registerFlagDefinition } from '#/app/flag/fla
 
 export const SECONDARY_MODEL_FLAG_ID = 'secondary-model';
 export const SECONDARY_MODEL_FLAG_ENV = 'KIMI_CODE_EXPERIMENTAL_SECONDARY_MODEL';
+export const AGENT_PROFILE_MODEL_BINDING_FLAG_ID = 'agent-profile-model-binding';
+export const AGENT_PROFILE_MODEL_BINDING_FLAG_ENV =
+  'KIMI_CODE_EXPERIMENTAL_AGENT_PROFILE_MODEL_BINDING';
 
 export const secondaryModelFlag: FlagDefinitionInput = {
   id: SECONDARY_MODEL_FLAG_ID,
@@ -24,3 +27,12 @@ export const secondaryModelFlag: FlagDefinitionInput = {
 };
 
 registerFlagDefinition(secondaryModelFlag);
+
+registerFlagDefinition({
+  id: AGENT_PROFILE_MODEL_BINDING_FLAG_ID,
+  title: 'Exact model binding in agent files',
+  description: 'Let file-defined subagent profiles bind an exact model alias and thinking effort.',
+  env: AGENT_PROFILE_MODEL_BINDING_FLAG_ENV,
+  default: false,
+  surface: 'core',
+});

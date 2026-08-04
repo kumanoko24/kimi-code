@@ -58,7 +58,7 @@ import { registerConfigSection } from '#/app/config/configSectionContributions';
 import type { ModelCapability } from '#/kosong/contract/capability';
 import type { IModelCatalog } from '#/kosong/model/catalog';
 
-import { SECONDARY_MODEL_FLAG_ID } from './flag';
+import { AGENT_PROFILE_MODEL_BINDING_FLAG_ID, SECONDARY_MODEL_FLAG_ID } from './flag';
 
 export const SUBAGENT_SECTION = 'subagent';
 
@@ -101,6 +101,11 @@ export function resolveSubagentTimeoutMs(config: IConfigService): number {
 
 export type SubagentModelChoice = AgentModelPreference;
 
+export interface AgentProfileModelBinding {
+  readonly model: string;
+  readonly thinking?: string;
+}
+
 export function resolveSecondaryModel(
   config: IConfigService,
   flags: IFlagService,
@@ -114,7 +119,15 @@ export function resolveSubagentBinding(
   flags: IFlagService,
   own: { modelAlias: string; thinkingLevel: string },
   requested?: SubagentModelChoice,
+  profileBinding?: AgentProfileModelBinding,
 ): { model: string; thinking?: string } {
+  if (
+    requested === undefined &&
+    profileBinding !== undefined &&
+    flags.enabled(AGENT_PROFILE_MODEL_BINDING_FLAG_ID)
+  ) {
+    return profileBinding;
+  }
   const secondary = resolveSecondaryModel(config, flags);
   if (requested !== 'primary' && secondary?.model !== undefined) {
     return {

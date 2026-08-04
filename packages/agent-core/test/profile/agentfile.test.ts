@@ -150,6 +150,35 @@ describe('parseAgentFileText', () => {
     );
   });
 
+  it('parses an exact model and thinking effort', () => {
+    const definition = parse(
+      agentFileText({
+        description: 'd',
+        model: 'local-openai-2234/gpt-5.6-sol',
+        thinking_effort: 'max',
+      }),
+    );
+    expect(definition).toMatchObject({
+      model: 'local-openai-2234/gpt-5.6-sol',
+      thinkingEffort: 'max',
+    });
+  });
+
+  it('rejects ambiguous or incomplete exact model bindings', () => {
+    expect(() =>
+      parse(
+        agentFileText({
+          description: 'd',
+          model: 'provider/model',
+          model_preference: 'primary',
+        }),
+      ),
+    ).toThrow(/mutually exclusive/);
+    expect(() =>
+      parse(agentFileText({ description: 'd', thinking_effort: 'max' })),
+    ).toThrow(/requires "model"/);
+  });
+
   it('ignores unknown frontmatter fields', () => {
     const definition = parse(agentFileText({ description: 'd', future_field: 'x' }));
     expect(definition.name).toBe('reviewer');
@@ -245,6 +274,26 @@ describe('agentProfileFromFile', () => {
     );
     expect(restricted.tools).toEqual(defaultTools);
     expect(restricted.disallowedTools).toEqual(['Bash', 'mcp__github__*']);
+  });
+
+  it('passes an exact model binding through to the runtime profile', () => {
+    const profile = agentProfileFromFile(
+      parseAgentFileText({
+        path: '/agents/gpt-reviewer.md',
+        source: 'user',
+        text: agentFileText({
+          description: 'd',
+          model: 'local-openai-2234/gpt-5.6-sol',
+          thinking_effort: 'xhigh',
+        }),
+      }),
+      defaultTools,
+      basePrompt,
+    );
+    expect(profile).toMatchObject({
+      model: 'local-openai-2234/gpt-5.6-sol',
+      thinkingEffort: 'xhigh',
+    });
   });
 });
 

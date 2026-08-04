@@ -1195,6 +1195,9 @@ describe('SessionSubagentHost', () => {
           provider: 'test-provider',
           model: 'cheap-model',
           maxContextSize: 1_000_000,
+          capabilities: ['thinking'],
+          supportEfforts: ['off', 'max'],
+          defaultEffort: 'off',
         },
         '__secondary__': {
           provider: 'test-provider',
@@ -1210,6 +1213,7 @@ describe('SessionSubagentHost', () => {
       providerManager?: Session['options']['providerManager'];
       modelChoice?: 'primary' | 'secondary';
       profilePreference?: 'primary' | 'secondary';
+      profileBinding?: { model: string; thinkingEffort: string };
     }) {
       const parent = testAgent();
       parent.configure();
@@ -1223,7 +1227,7 @@ describe('SessionSubagentHost', () => {
         providerManager: options.providerManager,
       });
       const host = new SessionSubagentHost(session, 'main');
-      if (options.profilePreference !== undefined) {
+      if (options.profilePreference !== undefined || options.profileBinding !== undefined) {
         vi.spyOn(
           host as unknown as {
             resolveProfile: (parent: Agent, name: string) => ResolvedAgentProfile;
@@ -1235,6 +1239,8 @@ describe('SessionSubagentHost', () => {
             tools: ['Read'],
             systemPrompt: 'coder prompt',
             modelPreference: options.profilePreference,
+            model: options.profileBinding?.model,
+            thinkingEffort: options.profileBinding?.thinkingEffort,
           }),
         );
       }
@@ -1299,6 +1305,37 @@ describe('SessionSubagentHost', () => {
         profilePreference: 'primary',
       });
       expect(child.agent.config.modelAlias).toBe(parent.agent.config.modelAlias);
+    });
+
+    it('binds an exact model and effort from an opted-in file profile', async () => {
+      const { child } = await spawnChild({
+        experimentalFlags: new FlagResolver({
+          KIMI_CODE_EXPERIMENTAL_AGENT_PROFILE_MODEL_BINDING: '1',
+        }),
+        profileBinding: { model: 'cheap-model', thinkingEffort: 'max' },
+      });
+      expect(child.agent.config.modelAlias).toBe('cheap-model');
+      expect(child.agent.config.thinkingEffort).toBe('max');
+    });
+
+    it('ignores an exact file-profile binding while the experiment is off', async () => {
+      const { parent, child } = await spawnChild({
+        profileBinding: { model: 'cheap-model', thinkingEffort: 'max' },
+      });
+      expect(child.agent.config.modelAlias).toBe(parent.agent.config.modelAlias);
+      expect(child.agent.config.thinkingEffort).toBe(parent.agent.config.thinkingEffort);
+    });
+
+    it('lets an explicit primary choice override an exact file-profile binding', async () => {
+      const { parent, child } = await spawnChild({
+        experimentalFlags: new FlagResolver({
+          KIMI_CODE_EXPERIMENTAL_AGENT_PROFILE_MODEL_BINDING: '1',
+        }),
+        profileBinding: { model: 'cheap-model', thinkingEffort: 'max' },
+        modelChoice: 'primary',
+      });
+      expect(child.agent.config.modelAlias).toBe(parent.agent.config.modelAlias);
+      expect(child.agent.config.thinkingEffort).toBe(parent.agent.config.thinkingEffort);
     });
 
     it('fails the spawn with a wrapped error when the secondary model does not resolve', async () => {
@@ -1925,6 +1962,8 @@ function profile(input: {
   readonly description?: string | undefined;
   readonly subagents?: Record<string, ResolvedAgentProfile> | undefined;
   readonly modelPreference?: 'primary' | 'secondary';
+  readonly model?: string;
+  readonly thinkingEffort?: string;
 }): ResolvedAgentProfile {
   return {
     name: input.name,
@@ -1933,6 +1972,8 @@ function profile(input: {
     tools: [...input.tools],
     subagents: input.subagents,
     modelPreference: input.modelPreference,
+    model: input.model,
+    thinkingEffort: input.thinkingEffort,
   };
 }
 

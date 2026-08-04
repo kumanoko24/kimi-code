@@ -380,6 +380,40 @@ describe('FullCompaction', () => {
     await ctx.expectResumeMatches();
   });
 
+  it('skips native compaction when the restored input already exceeds the model window', async () => {
+    vi.stubEnv(OPENAI_RESPONSES_COMPACTION_FLAG_ENV, '1');
+    const compact = vi.fn();
+    const ctx = testAgent({ compact });
+    ctx.configure({
+      provider: {
+        type: 'openai',
+        protocol: 'openai_responses',
+        apiKey: 'test-key',
+        baseUrl: 'https://api.example/v1',
+        model: 'gpt-5.6-sol',
+        nativeCompaction: true,
+      },
+      modelCapabilities: { ...CATALOGUED_MODEL_CAPABILITIES, max_context_tokens: 32 },
+    });
+    ctx.appendExchange(1, 'old user '.repeat(100), 'old assistant '.repeat(100), 20);
+    ctx.mockNextResponse({ type: 'text', text: 'Fallback summary.' });
+    const completed = ctx.once('compaction.completed');
+
+    await ctx.rpc.beginCompaction({});
+    await completed;
+
+    expect(compact).not.toHaveBeenCalled();
+    expect(ctx.context.get()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          content: expect.arrayContaining([
+            expect.objectContaining({ text: expect.stringContaining('Fallback summary.') }),
+          ]),
+        }),
+      ]),
+    );
+  });
+
   it('refreshes the active profile system prompt after compaction without resetting active tools', async () => {
     const homeDir = mkdtempSync(join(tmpdir(), 'kimi-compact-refresh-home-'));
     const workDir = mkdtempSync(join(tmpdir(), 'kimi-compact-refresh-work-'));
@@ -2814,16 +2848,19 @@ describe('FullCompaction', () => {
     expect(compactionMaxCompletionTokens).toEqual([64_000]);
   });
 
-  it('uses default 128k hardCap when maxOutputSize is not configured', async () => {
+  it('uses the default 128k provider-optional cap when maxOutputSize is not configured', async () => {
     let callCount = 0;
-    const compactionMaxCompletionTokens: unknown[] = [];
+    const compactionBudgets: unknown[] = [];
     const generate: GenerateFn = async (_provider, _system, _tools, _history, callbacks, options) => {
       callCount += 1;
       if (callCount === 1) {
         throw new APIContextOverflowError(400, 'Context length exceeded', 'req-default-cap');
       }
       if (callCount === 2) {
-        compactionMaxCompletionTokens.push(options?.maxCompletionTokens);
+        compactionBudgets.push({
+          maxCompletionTokens: options?.maxCompletionTokens,
+          maxCompletionTokensMode: options?.maxCompletionTokensMode,
+        });
         return textResult('Default cap compacted summary.');
       }
       await callbacks?.onMessagePart?.({
@@ -2844,7 +2881,12 @@ describe('FullCompaction', () => {
     await ctx.untilTurnEnd();
 
     expect(callCount).toBe(3);
-    expect(compactionMaxCompletionTokens).toEqual([128 * 1024]);
+    expect(compactionBudgets).toEqual([
+      {
+        maxCompletionTokens: 128 * 1024,
+        maxCompletionTokensMode: 'fallback',
+      },
+    ]);
   });
 
   it('ignores filtered assistant placeholders when checking the retained overflow suffix', async () => {

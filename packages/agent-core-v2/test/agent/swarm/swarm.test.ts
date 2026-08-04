@@ -841,6 +841,41 @@ describe('AgentSwarmTool', () => {
     );
   });
 
+  it('resolves every new swarm task from an exact target-profile binding', async () => {
+    const host = mockSwarmHost();
+    const reviewer = normalizeAgentProfile({
+      name: 'gpt-reviewer',
+      description: 'reviewer',
+      model: 'provider/reviewer',
+      thinkingEffort: 'xhigh',
+      systemPrompt: () => 'reviewer',
+    });
+    const tool = new AgentSwarmTool(host.swarmService, makeAgentScopeContext({ agentId: host.callerAgentId, agentScope: '' }), mockSwarmMode(), stubConfig(), stubFlag(true), stubSwarmCatalog(DEFAULT_CALLER_PROFILE, [reviewer]), stubCallerProfile({ modelAlias: 'main-model', thinkingLevel: 'high' }), stubModelCatalog());
+
+    await executeTool(
+      tool,
+      context({
+        description: 'Review files',
+        prompt_template: 'Review {{item}}',
+        items: ['src/a.ts', 'src/b.ts'],
+        subagent_type: 'gpt-reviewer',
+      }),
+    );
+
+    expect(host.swarmService.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tasks: [
+          expect.objectContaining({
+            binding: { model: 'provider/reviewer', thinking: 'xhigh' },
+          }),
+          expect.objectContaining({
+            binding: { model: 'provider/reviewer', thinking: 'xhigh' },
+          }),
+        ],
+      }),
+    );
+  });
+
   it('lets the tool call opt back into the primary model', async () => {
     const host = mockSwarmHost();
     const secondaryCoder: AgentProfile = normalizeAgentProfile({

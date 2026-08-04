@@ -27,6 +27,8 @@ export interface AgentFileDefinition {
   readonly disallowedTools?: readonly string[];
   readonly subagents?: readonly string[];
   readonly modelPreference?: AgentModelPreference;
+  readonly model?: string;
+  readonly thinkingEffort?: string;
   readonly prompt: string;
   readonly path: string;
   readonly source: AgentFileSource;
@@ -51,6 +53,8 @@ const AgentProfileSnapshotSchema = z.object({
   disallowedTools: z.array(z.string()).optional(),
   subagents: z.array(z.string()),
   modelPreference: z.enum(['primary', 'secondary']).optional(),
+  model: z.string().min(1).optional(),
+  thinkingEffort: z.string().min(1).optional(),
   prompt: z.string(),
   source: z.enum(['plugin', 'project', 'user', 'extra', 'explicit']).optional(),
 });

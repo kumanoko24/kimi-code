@@ -295,7 +295,10 @@ export class SubagentTool implements ISubagentTool {
         this.config,
         this.flags,
         { modelAlias: own.modelAlias, thinkingLevel: own.thinkingLevel },
-        args.model ?? profile.modelPreference,
+        args.model ?? (profile.model === undefined ? profile.modelPreference : undefined),
+        profile.model === undefined
+          ? undefined
+          : { model: profile.model, thinking: profile.thinkingEffort },
       );
       let created: IAgentScopeHandle;
       try {

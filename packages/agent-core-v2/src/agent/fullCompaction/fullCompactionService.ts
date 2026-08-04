@@ -625,7 +625,6 @@ export class AgentFullCompactionService extends Disposable implements IAgentFull
         maxContextTokens > 0
           ? Math.min(maxContextTokens, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS)
           : undefined;
-      const compactionMaxOutputSize = resolvedModel.maxOutputSize ?? defaultCompactionCap;
 
       const customInstruction = data.instruction?.trim() ?? '';
       const instruction = renderPrompt(compactionInstructionTemplate, {
@@ -648,7 +647,8 @@ export class AgentFullCompactionService extends Disposable implements IAgentFull
           const request = this.llmRequester.start(
             {
               messages,
-              maxOutputSize: compactionMaxOutputSize,
+              maxOutputSize: resolvedModel.maxOutputSize,
+              defaultMaxOutputSize: defaultCompactionCap,
               source: {
                 type: 'operation',
                 turnId: active.originTurnId,
@@ -792,9 +792,29 @@ export class AgentFullCompactionService extends Disposable implements IAgentFull
       customInstruction === undefined || customInstruction.length === 0
         ? this.profile.getSystemPrompt()
         : `${this.profile.getSystemPrompt()}\n\nCompaction preference:\n${customInstruction}`;
+    const messages = stripDynamicToolContext(input.originalHistory);
+    const estimatedInputTokens = this.tokenCounting.requestSize({
+      systemPrompt,
+      tools: [],
+      messages,
+    });
+    const effectiveMaxContextTokens = this.getEffectiveMaxContextTokens();
+    if (
+      effectiveMaxContextTokens > 0 &&
+      estimatedInputTokens > effectiveMaxContextTokens
+    ) {
+      this.log.warn('native OpenAI Responses compaction skipped: input exceeds model window', {
+        model: this.profile.data().modelAlias,
+        estimatedInputTokens,
+        effectiveMaxContextTokens,
+        messageCount: messages.length,
+        fallback: 'summary_compaction',
+      });
+      return undefined;
+    }
     const compacted = await this.llmRequester.compact(
       {
-        messages: stripDynamicToolContext(input.originalHistory),
+        messages,
         systemPrompt,
         source: {
           type: 'operation',

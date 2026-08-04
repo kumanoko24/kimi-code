@@ -16,6 +16,7 @@ import type { TokenUsage } from '#/kosong/contract/usage';
 import { IModelCatalog, type Model } from '#/kosong/model/catalog';
 import { SECONDARY_DERIVED_MODEL_ID } from '#/app/kosongConfig/secondaryModelOverlay';
 import {
+  AGENT_PROFILE_MODEL_BINDING_FLAG_ID,
   SECONDARY_MODEL_FLAG_ENV,
   SECONDARY_MODEL_FLAG_ID,
 } from '#/session/subagent/flag';
@@ -90,6 +91,13 @@ function secondaryModelFlags(enabled = true): TestAgentServiceOverride {
   return appService(
     IFlagService,
     stubFlag((id) => enabled && id === SECONDARY_MODEL_FLAG_ID),
+  );
+}
+
+function profileModelBindingFlags(enabled = true): TestAgentServiceOverride {
+  return appService(
+    IFlagService,
+    stubFlag((id) => enabled && id === AGENT_PROFILE_MODEL_BINDING_FLAG_ID),
   );
 }
 
@@ -177,6 +185,36 @@ function profileCatalogWithPreference(
     name: profileName,
     description: `${profileName} agent`,
     modelPreference,
+    systemPrompt: () => profileName,
+  });
+  return {
+    _serviceBrand: undefined,
+    ready: Promise.resolve(),
+    onDidChange: Event.None as ISessionAgentProfileCatalog['onDidChange'],
+    get: (name) => [main, target].find((profile) => profile.name === name),
+    getDefault: () => main,
+    list: () => [target],
+    inspect: () => undefined,
+    load: async () => {},
+    reload: async () => {},
+  };
+}
+
+function profileCatalogWithBinding(
+  profileName: string,
+  model: string,
+  thinkingEffort: string,
+): ISessionAgentProfileCatalog {
+  const main: AgentProfile = normalizeAgentProfile({
+    name: 'agent',
+    description: 'Main agent',
+    systemPrompt: () => 'main',
+  });
+  const target: AgentProfile = normalizeAgentProfile({
+    name: profileName,
+    description: `${profileName} agent`,
+    model,
+    thinkingEffort,
     systemPrompt: () => profileName,
   });
   return {
@@ -825,7 +863,12 @@ describe('Agent tool execution contract', () => {
       sessionService(ISessionSubagentService, lifecycle),
       sessionService(ISessionCronService, cronStub),
       modelProviderServices(
-        modelCatalogResolving('mock-model', 'provider/secondary', SECONDARY_DERIVED_MODEL_ID),
+        modelCatalogResolving(
+          'mock-model',
+          'provider/secondary',
+          'provider/reviewer',
+          SECONDARY_DERIVED_MODEL_ID,
+        ),
       ),
       ...extra,
     );
@@ -1110,6 +1153,58 @@ describe('Agent tool execution contract', () => {
           model: 'mock-model',
           thinking: 'off',
         }),
+      }),
+    );
+  });
+
+  it('uses an opted-in exact model and effort from the target profile', async () => {
+    const lifecycle = createAgentLifecycleStub({ createAgentIds: ['agent-child'] });
+    const context = createAgentToolContext(
+      lifecycle,
+      sessionService(
+        ISessionAgentProfileCatalog,
+        profileCatalogWithBinding('gpt-reviewer', 'provider/reviewer', 'xhigh'),
+      ),
+      profileModelBindingFlags(),
+    );
+
+    await executeAgentTool(context, {
+      prompt: 'Review',
+      description: 'Review work',
+      subagent_type: 'gpt-reviewer',
+    });
+
+    expect(lifecycle.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        binding: expect.objectContaining({
+          profile: 'gpt-reviewer',
+          model: 'provider/reviewer',
+          thinking: 'xhigh',
+        }),
+      }),
+    );
+  });
+
+  it('ignores an exact target-profile binding while the experiment is off', async () => {
+    const lifecycle = createAgentLifecycleStub({ createAgentIds: ['agent-child'] });
+    const context = createAgentToolContext(
+      lifecycle,
+      sessionService(
+        ISessionAgentProfileCatalog,
+        profileCatalogWithBinding('gpt-reviewer', 'provider/reviewer', 'xhigh'),
+      ),
+      profileModelBindingFlags(false),
+    );
+
+    await executeAgentTool(context, {
+      prompt: 'Review',
+      description: 'Review work',
+      subagent_type: 'gpt-reviewer',
+    });
+
+    expect(lifecycle.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        binding: expect.objectContaining({ model: 'mock-model', thinking: 'off' }),
       }),
     );
   });

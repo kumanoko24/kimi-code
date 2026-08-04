@@ -440,13 +440,21 @@ export class FullCompaction {
         maxContextTokens > 0
           ? Math.min(maxContextTokens, DEFAULT_COMPACTION_MAX_COMPLETION_TOKENS)
           : undefined;
+      const configuredBudget = resolveCompletionBudget({
+        maxOutputSize: this.agent.config.maxOutputSize,
+        reservedContextSize: this.agent.kimiConfig?.loopControl?.reservedContextSize,
+      });
+      const usesDefaultCompactionCap =
+        configuredBudget !== undefined &&
+        configuredBudget.hardCap === undefined &&
+        defaultCompactionCap !== undefined;
       const provider = applyCompletionBudget({
         provider: this.agent.config.provider,
-        budget: resolveCompletionBudget({
-          maxOutputSize: this.agent.config.maxOutputSize ?? defaultCompactionCap,
-          reservedContextSize: this.agent.kimiConfig?.loopControl?.reservedContextSize,
-        }),
+        budget: usesDefaultCompactionCap
+          ? { hardCap: defaultCompactionCap }
+          : configuredBudget,
         capability,
+        mode: usesDefaultCompactionCap ? 'fallback' : undefined,
       });
       const instruction = this.buildInstruction(data.instruction);
 
@@ -703,10 +711,27 @@ export class FullCompaction {
       stripDynamicToolContext(input.originalHistory),
       { synthesizeMissing: true, dropOrphanResults: true },
     );
+    const estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokensForMessages(messages);
+    const effectiveMaxContextTokens = this.getEffectiveMaxContextTokens();
+    if (
+      effectiveMaxContextTokens > 0 &&
+      estimatedInputTokens > effectiveMaxContextTokens
+    ) {
+      this.agent.log.warn('native OpenAI Responses compaction skipped: input exceeds model window', {
+        model: provider.modelName,
+        estimatedInputTokens,
+        effectiveMaxContextTokens,
+        messageCount: messages.length,
+        fallback: 'summary_compaction',
+      });
+      return undefined;
+    }
     this.agent.log.info('native OpenAI Responses compaction started', {
       model: provider.modelName,
       protocol: 'openai_responses',
       messageCount: messages.length,
+      estimatedInputTokens,
+      effectiveMaxContextTokens,
     });
 
     const run = (auth?: import('@moonshot-ai/kosong').ProviderRequestAuth) =>

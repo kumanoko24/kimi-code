@@ -82,6 +82,26 @@ describe('parseAgentFileText', () => {
     ).toThrow(/"model_preference"/);
   });
 
+  it('parses an exact model and thinking effort', () => {
+    const def = parse(
+      '---\nname: gpt-reviewer\ndescription: d\nmodel: local-openai-2234/gpt-5.6-sol\nthinking_effort: xhigh\n---\n\nbody\n',
+    );
+
+    expect(def.model).toBe('local-openai-2234/gpt-5.6-sol');
+    expect(def.thinkingEffort).toBe('xhigh');
+  });
+
+  it('rejects ambiguous or incomplete exact model bindings', () => {
+    expect(() =>
+      parse(
+        '---\nname: solo\ndescription: d\nmodel: provider/model\nmodel_preference: primary\n---\n\nbody\n',
+      ),
+    ).toThrow(/mutually exclusive/);
+    expect(() =>
+      parse('---\nname: solo\ndescription: d\nthinking_effort: max\n---\n\nbody\n'),
+    ).toThrow(/requires "model"/);
+  });
+
   it('rejects missing frontmatter', () => {
     expect(() => parse('no frontmatter here')).toThrow(AgentFileParseError);
   });
@@ -228,6 +248,20 @@ describe('agentProfileFromFile', () => {
     expect(profile.tools).toBeUndefined();
     expect(profile.whenToUse).toBe('reviews');
     expect(profile.override).toBe(false);
+  });
+
+  it('passes an exact model binding through to the runtime profile', () => {
+    const profile = agentProfileFromFile(
+      {
+        ...base,
+        model: 'local-openai-2234/gpt-5.6-sol',
+        thinkingEffort: 'max',
+      },
+      basePrompt,
+    );
+
+    expect(profile.model).toBe('local-openai-2234/gpt-5.6-sol');
+    expect(profile.thinkingEffort).toBe('max');
   });
 
   it('substitutes context variables in the body', () => {
