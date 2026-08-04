@@ -1,8 +1,8 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-04T06:16:00+08:00`
+- updated_at: `2026-08-04T19:33:29+08:00`
 - objective: add native OpenAI Responses support for GPT-5.6 Sol, Terra, and Luna through the local port 2234 gateway
-- current milestone: M3 — live Kimi profile and end-to-end RBV
+- current milestone: M5 — isolated `kiminn` installation
 - status: PASS
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
@@ -120,8 +120,34 @@ Evidence:
 - installed-binary session `session_a89fc506-fa52-4b7a-a150-8d8fa52cf6eb` returned `FIRST_INSTALLED_DONE`, triggered native compact with `thinkingEffort = "high"`, persisted four opaque provider items, then returned `SECOND_INSTALLED_DONE`; gateway requests `ac8ad0b4bb5d4ab6b509bf8135a6240c`, `47dcb9c129ec43af96b75632ea77cbef`, and `af785744ac2645d0b871d68cd2e7ecb2` shared one sticky session hash and all completed with HTTP 200;
 - final gates passed: kosong 49 files / 1,364 tests, v2 288 files / 4,487 tests, legacy 225 files / 4,124 passing tests, TUI image 19 tests, all three relevant typechecks, native SEA smoke, VitePress build, changeset status, diff check, and changed-file lint with zero errors.
 
+### M5 — isolated `kiminn` installation (PASS)
+
+Verified at `2026-08-04 19:33 UTC+8`.
+
+Success criteria:
+
+- `kiminn` uses the tuned binary without modifying or replacing the existing `kimi` executable, configuration, sessions, or state;
+- interactive invocations start in auto permission mode with Sol and xhigh thinking by default;
+- prompt mode remains usable despite Kimi's explicit `--prompt` / `--auto` conflict;
+- user and workspace AGENTS.md plus generic and workspace skills are discovered through the normal Kimi paths;
+- a real tool-calling request reaches port 2234 and the TUI exposes the effective mode, model, and effort.
+
+Recovery boundary: the whole installation is contained under `/Users/noelbao/.kiminn` plus the single entrypoint `/Users/noelbao/.local/bin/kiminn`; the existing `/Users/noelbao/.kimi-code` tree requires no rollback.
+
+Evidence:
+
+- `/Users/noelbao/.kiminn/bin/kimi` is a byte-identical snapshot of the tuned `0.31.1` binary at SHA-256 `95a32c2d5f6908c7b7dd1c70da981a6ea9197d5683bea3dcd8f00484e346aec1`;
+- `/Users/noelbao/.local/bin/kiminn` pins `KIMI_CODE_HOME=/Users/noelbao/.kiminn` and injects `--auto` for interactive invocations; explicit prompt or permission flags bypass that default so valid CLI combinations remain valid;
+- dedicated config validation passed and selects `local-openai-2234/gpt-5.6-sol`, xhigh thinking, native Responses compaction, the per-session cache header, a 258000 input/context cap, and the same Terra/Luna alternatives;
+- prompt RBV session `session_3511bd01-5c24-4c9d-abac-0d4412ca6185` executed Bash without an approval stop, printed `KIMINN_AUTO_TOOL_OK`, and returned `KIMINN_PROMPT_RBV_OK`;
+- its wire facts record `permission.set_mode = "auto"`, `model = "gpt-5.6-sol"`, and `thinkingEffort = "xhigh"`; gateway requests `e4e648e06bc44a0db240f0d1a7f1f97d` and `97c7a3eb628e46008820390880880b84` shared one explicit session identity, progressed from `new_assignment` to `sticky_hit`, and completed with HTTP 200;
+- the injected prompt identifies `/Users/noelbao/.kiminn/AGENTS.md` and `/Volumes/K/Works/kimi-code/AGENTS.md`, and enumerates workspace `.agents/skills` including `agent-core-dev`, `gen-changesets`, and `write-tui`; normal discovery also retains user `~/.agents/skills`;
+- interactive TUI session `session_03d71907-d457-4660-aadc-aa7183570c95` visibly rendered `auto`, `GPT-5.6 Sol (local 2234)`, and `thinking: xhigh` in its footer;
+- the original Kimi config, binary, and AGENTS.md checksums remain unchanged; the copied AGENTS.md snapshot matches the original at SHA-256 `e6377e8c1db1a8cc9e6537ec2a2954377a02703c91a8248f914940e1308d3e8d`.
+
 Local recovery:
 
 - pre-change Kimi config: `/Users/noelbao/.kimi-code/backups/openai-responses-20260804-0550/config.toml`;
 - pre-change Kimi binary: `/Users/noelbao/.kimi-code/backups/openai-responses-20260804-0550/kimi`;
 - pre-change gateway wheel: `/Users/noelbao/Library/Application Support/openai-api-gateway/releases/2234/releases/24db43a15ec0d74e5566dabdba877b469bd22f5c758f99a9203c1a2d4dfefa55.whl`.
+- isolated install receipt: `/Users/noelbao/.kiminn/install-receipt.toml`.
