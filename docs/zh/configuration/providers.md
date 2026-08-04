@@ -95,7 +95,7 @@ api_key = "sk-xxxxx"
 
 ## `openai_responses`
 
-对应 OpenAI 较新的 Responses API，始终以流式方式工作。它支持供应商原生压缩，也可以为兼容网关动态写入缓存 header。
+对应 OpenAI 较新的 Responses API，始终以流式方式工作。它支持文本和图片输入、供应商原生压缩，也可以为兼容网关动态写入缓存 header。对于支持图片的模型别名，请在 `capabilities` 中加入 `image_in`；粘贴的图片会作为 Responses `input_image` data URL 发送。
 
 - 默认 `base_url`：`https://api.openai.com/v1`
 - 凭证键名：`OPENAI_API_KEY`、`OPENAI_BASE_URL`
@@ -109,7 +109,7 @@ api_key = "YOUR_API_KEY"
 
 如果网关通过请求 header 保持会话亲和性，可配置 `cache_key_header`。Kimi Code 会把同一个自动生成的会话值写入该 header 和 Responses API 的 `prompt_cache_key`，不会让所有会话共用一个静态值。
 
-如需供应商原生压缩，请同时开启实验功能并让供应商显式 opt in。此后 `/compact` 和自动 full compaction 会调用 `POST /responses/compact`，把返回的 output 保存为不透明供应商状态，并在下一次 Responses 请求中原样重放。如果任一开关未启用，Kimi Code 会继续走现有的文本压缩路径。
+如需供应商原生压缩，请同时开启实验功能并让供应商显式 opt in。此后 `/compact` 和自动 full compaction 会调用 `POST /responses/compact`，把会话作为 `input`、当前系统提示词作为 `instructions`，并把选定的 Thinking effort 作为 `reasoning` 发送。压缩由该端点自行完成，不需要另外提供摘要提示词。Kimi Code 会把返回的 output 保存为不透明供应商状态，并在下一次 Responses 请求中原样重放。如果任一开关未启用，Kimi Code 会继续走现有的基于提示词的文本压缩路径。
 
 ```toml
 [experimental]
@@ -127,7 +127,7 @@ provider = "responses-gateway"
 model = "example-model"
 max_context_size = 258000
 max_input_size = 258000
-capabilities = ["thinking", "tool_use"]
+capabilities = ["thinking", "tool_use", "image_in"]
 support_efforts = ["medium", "high", "xhigh"]
 default_effort = "medium"
 ```

@@ -176,14 +176,15 @@ describe('OpenAIResponsesChatProvider', () => {
       ]);
     });
 
-    it('image url in user message is encoded as input_image', async () => {
+    it('inline image in user message is encoded as input_image', async () => {
       const provider = createProvider();
+      const imageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB';
       const history: Message[] = [
         {
           role: 'user',
           content: [
             { type: 'text', text: "What's in this image?" },
-            { type: 'image_url', imageUrl: { url: 'https://example.com/image.png' } },
+            { type: 'image_url', imageUrl: { url: imageUrl } },
           ],
           toolCalls: [],
         },
@@ -197,7 +198,7 @@ describe('OpenAIResponsesChatProvider', () => {
             {
               type: 'input_image',
               detail: 'auto',
-              image_url: 'https://example.com/image.png',
+              image_url: imageUrl,
             },
           ],
           role: 'user',
@@ -1070,7 +1071,7 @@ describe('OpenAIResponsesChatProvider', () => {
         cacheKeyHeader: 'X-Session-ID',
         nativeCompaction: true,
         generationKwargs: { prompt_cache_key: 'session-test' },
-      });
+      }).withThinking('high');
       const compact = vi.fn().mockResolvedValue({
         id: 'cmp_test',
         object: 'response.compaction',
@@ -1093,6 +1094,7 @@ describe('OpenAIResponsesChatProvider', () => {
           model: 'gpt-5.6-sol',
           instructions: 'system',
           prompt_cache_key: 'session-test',
+          reasoning: { effort: 'high', summary: 'auto' },
         }),
         { headers: { 'X-Session-ID': 'session-test' } },
       );

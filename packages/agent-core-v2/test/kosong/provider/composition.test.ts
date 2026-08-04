@@ -715,6 +715,37 @@ describe('per-turn intent wire encoding (behavior probes)', () => {
     });
   });
 
+  it('sends a pasted data-URI image as Responses input_image', async () => {
+    const provider = new OpenAIResponsesChatProvider({
+      model: 'gpt-5.6-sol',
+      apiKey: 'sk-probe',
+    });
+    const imageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB';
+    const history: Message[] = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Inspect this image.' },
+          { type: 'image_url', imageUrl: { url: imageUrl } },
+        ],
+        toolCalls: [],
+      },
+    ];
+
+    const request = await captureResponsesBody(provider, undefined, history);
+
+    expect(request['input']).toEqual([
+      {
+        type: 'message',
+        role: 'user',
+        content: [
+          { type: 'input_text', text: 'Inspect this image.' },
+          { type: 'input_image', detail: 'auto', image_url: imageUrl },
+        ],
+      },
+    ]);
+  });
+
   it('calls the opt-in Responses compact endpoint and returns opaque provider state', async () => {
     const provider = new OpenAIResponsesChatProvider({
       model: 'gpt-5.6-sol',
@@ -746,12 +777,14 @@ describe('per-turn intent wire encoding (behavior probes)', () => {
 
     const result = await provider.compact!('system prompt', PROBE_HISTORY, {
       cacheKey: 'session-probe',
+      thinking: { effort: 'xhigh' },
     });
 
     expect(params).toMatchObject({
       model: 'gpt-5.6-sol',
       instructions: 'system prompt',
       prompt_cache_key: 'session-probe',
+      reasoning: { effort: 'xhigh', summary: 'auto' },
       input: expect.any(Array),
     });
     expect(requestOptions?.['headers']).toEqual({ 'X-Pool-Session-ID': 'session-probe' });

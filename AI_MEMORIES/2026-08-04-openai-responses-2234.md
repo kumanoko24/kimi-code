@@ -92,6 +92,34 @@ Evidence:
 - final regression gates passed: v2 288 files / 4,485 tests, legacy 225 files / 4,124 passing tests, kosong 49 files / 1,364 tests, all four relevant typechecks, all three package builds, native SEA smoke, VitePress build, changeset status, diff check, and changed-file lint with zero errors;
 - English and Chinese user docs describe the dynamic cache header, native Responses compaction, experiment flag, and `/compact` behavior. The documented `gen-docs` sync helper is absent from this checkout, so the two language trees were updated manually and verified by the docs build.
 
+### M4 — image input and compaction semantics (PASS)
+
+Verified at `2026-08-04 15:07 UTC+8`.
+
+Success criteria:
+
+- pasted data-URI images remain intact through both OpenAI Responses adapters;
+- real Sol, Terra, and Luna requests identify image content without the expected answer appearing in the prompt;
+- native `/responses/compact` semantics match current OpenAI Codex behavior;
+- focused tests, bilingual docs, one checkpoint commit, and the origin branch remain recoverable.
+
+Recovery boundary: revert the M4 checkpoint commit. M4 changes no live config, gateway artifact, credentials, or listener state.
+
+Evidence:
+
+- the TUI turns pasted image bytes into a data URL, and both Responses adapters encode that value as `input_image`; focused legacy and v2 contract tests pin the data-URI shape;
+- direct blind image RBV through `127.0.0.1:2234/v1/responses` returned `{"letter":"K","dot_color":"blue"}` for Sol, Terra, and Luna in response IDs `resp_024ba0929d237789016a718c620eac81979e72f833a11cdf29`, `resp_0ae4153db22d5780016a718c64b328819796ec750e946e6f10`, and `resp_04b0c967ba98504e016a718c66ce2c8195960f69325fed6be7`;
+- gateway request IDs `9245e1542e5f489583ad15abd603b056`, `8338a081d12943aaa19c6b3376330385`, and `7638704c6165451b9aa0c15a603128f2` each recorded `explicit_session_header`, HTTP 200, and terminal usage;
+- real Kimi SDK-engine sessions `session_e15323f1-e7d2-463e-aab8-8e2cf0bd1ab7`, `session_254b8070-0e0f-4015-be69-ace381dee5f9`, and `session_21ad15fd-3fa7-496c-bf12-82276e8c967a` used the live Sol, Terra, and Luna aliases with image input and returned `K_BLUE`, `K_blue`, and `K_blue`;
+- the live aliases all retain `capabilities = ["thinking", "tool_use", "image_in"]`, and the loopback listener remains PID `21835` on the same deployed wheel;
+- current OpenAI Codex source at `5af85998c24fb3353ddd8164c3ed472057b03cb3` sends history as `input` and base instructions as `instructions` to the dedicated compact endpoint, without a summary prompt; its separate local fallback appends `SUMMARIZATION_PROMPT` and runs an ordinary Responses inference;
+- Kimi's native path matches that split: it sends conversation input plus the active system prompt and selected `medium` / `high` / `xhigh` reasoning effort to `/responses/compact`, while its existing text fallback remains prompt-based;
+- the Codex comparison exposed and fixed a legacy clone-binding defect that kept native compact bound to the pre-`withThinking` provider; v2 now forwards per-turn thinking params through the model requester as well;
+- direct compact-effort RBV sent `reasoning.effort = "xhigh"` through port 2234 and returned `response.compaction` ID `resp_018f010ea90ace61016a718ee23be08194bdcf4b14eb4df28a`; gateway request `af442945590246aa81d3091dcecb732e` completed with HTTP 200;
+- the newly installed Kimi binary SHA-256 is `95a32c2d5f6908c7b7dd1c70da981a6ea9197d5683bea3dcd8f00484e346aec1`; `kimi doctor` and native smoke passed, and the replaced binary is recoverable at `/Users/noelbao/.kimi-code/backups/openai-responses-20260804-1505/kimi`;
+- installed-binary session `session_a89fc506-fa52-4b7a-a150-8d8fa52cf6eb` returned `FIRST_INSTALLED_DONE`, triggered native compact with `thinkingEffort = "high"`, persisted four opaque provider items, then returned `SECOND_INSTALLED_DONE`; gateway requests `ac8ad0b4bb5d4ab6b509bf8135a6240c`, `47dcb9c129ec43af96b75632ea77cbef`, and `af785744ac2645d0b871d68cd2e7ecb2` shared one sticky session hash and all completed with HTTP 200;
+- final gates passed: kosong 49 files / 1,364 tests, v2 288 files / 4,487 tests, legacy 225 files / 4,124 passing tests, TUI image 19 tests, all three relevant typechecks, native SEA smoke, VitePress build, changeset status, diff check, and changed-file lint with zero errors.
+
 Local recovery:
 
 - pre-change Kimi config: `/Users/noelbao/.kimi-code/backups/openai-responses-20260804-0550/config.toml`;

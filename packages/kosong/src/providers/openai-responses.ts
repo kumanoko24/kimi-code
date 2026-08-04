@@ -1226,6 +1226,10 @@ export class OpenAIResponsesChatProvider implements ChatProvider {
       input,
       instructions: systemPrompt || undefined,
       prompt_cache_key: this._generationKwargs['prompt_cache_key'],
+      reasoning:
+        typeof this._generationKwargs.reasoning_effort === 'string'
+          ? { effort: this._generationKwargs.reasoning_effort, summary: 'auto' }
+          : undefined,
     };
     for (const key of Object.keys(params)) {
       if (params[key] === undefined) {
@@ -1286,6 +1290,9 @@ export class OpenAIResponsesChatProvider implements ChatProvider {
       this,
     );
     clone._generationKwargs = { ...this._generationKwargs };
+    if (clone.compact !== undefined) {
+      Object.assign(clone, { compact: clone._compact.bind(clone) });
+    }
     return clone;
   }
 

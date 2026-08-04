@@ -1214,11 +1214,22 @@ export class OpenAIResponsesChatProvider implements ChatProvider {
       this._model,
       this._toolMessageConversion,
     );
+    const thinking =
+      options?.thinking ??
+      (this._thinkingEffort !== undefined ? { effort: this._thinkingEffort } : undefined);
+    const reasoningEffort =
+      thinking?.effort === 'off'
+        ? this._offEffort
+        : thinking?.effort === 'on'
+          ? undefined
+          : thinking?.effort;
     const params: Record<string, unknown> = {
       model: this._model,
       input,
       instructions: systemPrompt || undefined,
       prompt_cache_key: options?.cacheKey,
+      reasoning:
+        reasoningEffort === undefined ? undefined : { effort: reasoningEffort, summary: 'auto' },
     };
     for (const key of Object.keys(params)) {
       if (params[key] === undefined) {

@@ -99,6 +99,10 @@ export class ModelRequesterImpl implements ModelRequester {
           signal,
           auth,
           cacheKey: params?.cacheKey,
+          thinking:
+            params?.thinkingEffort === undefined
+              ? undefined
+              : { effort: params.thinkingEffort, keep: params.thinkingKeep },
           onTraceId: params?.onTraceId,
         }),
       );

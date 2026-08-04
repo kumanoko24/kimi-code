@@ -40,6 +40,7 @@ class FakeChatProvider implements ChatProvider {
   readonly thinkingEffort = null;
 
   uploadVideo?: ChatProvider['uploadVideo'];
+  compact?: ChatProvider['compact'];
 
   readonly calls: Array<{
     systemPrompt: string;
@@ -178,6 +179,33 @@ describe('ModelRequesterImpl request execution', () => {
     expect(options?.usedContextTokens).toBe(5000);
     expect(options?.maxContextTokens).toBe(128000);
     expect(options?.responseFormat).toEqual({ type: 'json_object' });
+  });
+
+  it('maps cache and thinking params onto native compaction options', async () => {
+    const provider = new FakeChatProvider();
+    let options: GenerateOptions | undefined;
+    provider.compact = (_systemPrompt, _history, receivedOptions) => {
+      options = receivedOptions;
+      return Promise.resolve({
+        state: { protocol: 'openai_responses', items: [] },
+        usage: emptyUsage(),
+      });
+    };
+    const requester = new ModelRequesterImpl(modelWith(staticAuth('sk-1')), registryReturning(provider));
+    const signal = AbortSignal.timeout(1000);
+
+    await requester.compact(INPUT, signal, {
+      cacheKey: 'session-1',
+      thinkingEffort: 'xhigh',
+      thinkingKeep: 'all',
+    });
+
+    expect(options).toMatchObject({
+      signal,
+      auth: { apiKey: 'sk-1' },
+      cacheKey: 'session-1',
+      thinking: { effort: 'xhigh', keep: 'all' },
+    });
   });
 
   it('rejects opaque provider state before sending it through a different protocol', async () => {
