@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-05T05:21:58+08:00`
+- updated_at: `2026-08-05T05:36:16+08:00`
 - objective: retain native OpenAI Responses support while syncing upstream and adding isolated `kiminn` session/OAuth interoperability
 - current milestone: M6c — isolated rebuild, config, and real RBV
-- status: IN PROGRESS (`M6a` and `M6b` PASS; `M6c` pending)
+- status: PASS (`M6a`, `M6b`, and `M6c` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -187,6 +187,38 @@ Evidence:
 - v2 rejects a distinct auth home explicitly because its engine-owned auth service cannot yet honor this split;
 - live inventory found canonical file-backed OAuth under `~/.kimi-code/credentials` with mode `0600`; no credential content was printed;
 - protocol, agent-core, SDK, and CLI typechecks passed; 43 focused SDK tests and 34 CLI tests passed.
+
+### M6c — isolated rebuild, configuration, and real RBV (PASS)
+
+Verified at `2026-08-05 05:36 UTC+8`.
+
+Success criteria:
+
+- rebuild and install only the isolated `kiminn` binary, preserving the existing `~/.kimi-code` binary, configuration, and default behavior;
+- keep `kiminn` interactive defaults at auto / Sol / xhigh while exposing Kimi K3 and K3 256 through the canonical Coding Plan OAuth;
+- prove bidirectional session discovery and origin-bound storage through both the interactive picker and real exports;
+- re-prove Sol, Terra, and Luna image input against the live port 2234 gateway and inspect the local observability UI on desktop and mobile;
+- pass focused regressions, native smoke, changeset validation, rollback capture, and push only the fork feature branch.
+
+Recovery boundary: restore `/Users/noelbao/.kiminn` from `/Users/noelbao/.kiminn/backups/shared-session-oauth-20260805-0524/`, or remove `KIMI_CODE_SESSION_HOME` and `KIMI_CODE_AUTH_HOME` from the isolated wrapper. No rollback of the canonical Kimi binary or configuration is required.
+
+Evidence:
+
+- checkpoint commits `559617fc1` and `4fbb2260d` implement the isolated session and OAuth mechanisms; `9c99bf54f` closes the top-level login-path escape and adds the CLI changeset;
+- `/Users/noelbao/.kiminn/bin/kimi` is version `0.32.0`, built from `9c99bf54f73b31a57e816f74182f593e7db55cc0`, and has SHA-256 `a91f1063a9be8298de347c8e92a0fe0b47445525dfa3dcbb4c7a5619e7120d33`; `kiminn doctor` and native SEA smoke passed;
+- the isolated wrapper points runtime state at `~/.kiminn`, new sessions at `~/.kimi-code`, and managed auth at `~/.kimi-code`; it injects auto only for interactive invocations;
+- the isolated config retains `local-openai-2234/gpt-5.6-sol` and xhigh as defaults and adds selectable `kimi-code/k3` and `kimi-code/k3-256k` aliases without changing the canonical config;
+- the canonical Kimi binary remains SHA-256 `c3009019e0f8f0e6c30550643b78ebd0c91815423b915352fcd0914945950a42`, and its config remains SHA-256 `e8e084faca80e5395efed2703e075e2e55553eadf080c8539006dff51a6ac13e`;
+- real K3 and K3-256 requests selected the exact managed models and reached the official Kimi Coding Plan API through the canonical OAuth, but both terminated with HTTP 403 because the account has reached its billing-cycle usage limit; this is an external quota limitation, not a fallback or local auth/config failure;
+- normal managed-token refresh rotated the canonical credential to SHA-256 `22d9b2d626c1950a724df6c47e41fc97a1328f27cd91d6413797c047b34d4a04`; the source remained `~/.kimi-code/credentials/kimi-code.json` with mode `0600`, and no credential was copied or printed;
+- a default real turn returned exact `KIMINN_DEFAULT_SOL_XHIGH_OK`; its wire facts prove OpenAI Responses, `gpt-5.6-sol`, xhigh, and the local 2234 alias;
+- installed `kiminn` image turns returned exact `GPT_5_6_SOL_IMAGE_BLUE_OK`, `GPT_5_6_TERRA_IMAGE_BLUE_OK`, and `GPT_5_6_LUNA_IMAGE_BLUE_OK`; each wire transcript contains `ReadMediaFile`, image content, the expected model, and xhigh effort;
+- `/sessions` displayed canonical and fallback homes together, selected fallback session `session_3511bd01-5c24-4c9d-abac-0d4412ca6185`, restored its prior transcript, and visibly reported `Resumed session`; original `kimi` also exported a new `kiminn` session, while `kiminn` exported that fallback session, and both archives passed ZIP inspection;
+- new K3 RBV sessions were written to the canonical session index and not the isolated fallback index, while resuming the fallback kept its origin binding;
+- the loopback gateway remained healthy on `127.0.0.1:2234`; the local dashboard snapshot reported four selected sessions, seven successful requests, 232127 input tokens, 62464 cached input tokens, 287 output tokens, and a 26.9% cache-hit ratio across Sol, Terra, and Luna;
+- desktop and mobile browser RBV of `http://127.0.0.1:2234/dashboard` passed; the UI exposes readiness, alive-session state, model/effort, safe session hashes, usage, cache, outcome, and latency without prompts, raw session IDs, credentials, emails, or account IDs;
+- final gates passed: four relevant typechecks; session-store 26 tests; SDK 64 tests; CLI 23 tests; Responses 83 tests; legacy compaction 107 passing tests plus existing skips/expected failures; v2 compaction 89 tests; native SEA smoke; and changeset status with only a patch bump for `@moonshot-ai/kimi-code`;
+- `gen-docs` could not run because its required `docs/scripts/sync-changelog.mjs` is absent from the upstream-synced tree; no replacement script or unrelated manual docs drift was introduced. The CLI-facing behavior is recorded in `.changeset/isolate-session-auth-homes.md` and this action ledger.
 
 Local recovery:
 
