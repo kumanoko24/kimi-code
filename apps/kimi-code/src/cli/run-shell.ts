@@ -26,6 +26,7 @@ import { loadTuiConfig, TuiConfigParseError } from '#/tui/config';
 import { CHROME_GUTTER } from '#/tui/constant/rendering';
 import { KimiTUI } from '#/tui/index';
 import { startupTrace } from '#/utils/startup-trace';
+import { getSessionHomeDir } from '#/utils/paths';
 import { currentTheme, getColorPalette } from '#/tui/theme';
 import { toTerminalHyperlink } from '#/utils/terminal-hyperlink';
 import { restoreTerminalModes } from '#/utils/terminal-restore';
@@ -66,6 +67,7 @@ export async function runShell(
   };
   const harnessOptions: KimiHarnessOptions = {
     homeDir: telemetryBootstrap.homeDir,
+    sessionHomeDir: getSessionHomeDir(),
     identity: createKimiCodeHostIdentity(version),
     skillDirs: opts.skillsDirs,
     telemetry: telemetryClient,

@@ -13,6 +13,7 @@ export const ErrorCodes = {
 
   SESSION_NOT_FOUND: 'session.not_found',
   SESSION_ALREADY_EXISTS: 'session.already_exists',
+  SESSION_STORAGE_CONFLICT: 'session.storage_conflict',
   SESSION_ID_INVALID: 'session.id_invalid',
   SESSION_ID_REQUIRED: 'session.id_required',
   SESSION_ID_EMPTY: 'session.id_empty',
@@ -113,6 +114,12 @@ export const KIMI_ERROR_INFO = {
     retryable: false,
     public: true,
     action: 'Use a different session id or remove the existing session first.',
+  },
+  'session.storage_conflict': {
+    title: 'Session storage conflict',
+    retryable: false,
+    public: true,
+    action: 'Rename or archive one copy before resuming this session.',
   },
   'session.id_invalid': {
     title: 'Invalid session id',

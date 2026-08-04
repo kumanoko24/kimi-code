@@ -215,6 +215,7 @@ export type KimiErrorCode =
   | 'config.invalid'
   | 'session.not_found'
   | 'session.already_exists'
+  | 'session.storage_conflict'
   | 'session.id_invalid'
   | 'session.id_required'
   | 'session.id_empty'
@@ -1172,6 +1173,7 @@ export const kimiErrorCodeSchema = z.enum([
   'config.invalid',
   'session.not_found',
   'session.already_exists',
+  'session.storage_conflict',
   'session.id_invalid',
   'session.id_required',
   'session.id_empty',

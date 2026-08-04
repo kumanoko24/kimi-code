@@ -17,6 +17,7 @@ import {
 import { resolve } from 'pathe';
 
 import { CLI_SHUTDOWN_TIMEOUT_MS, PROMPT_CLEANUP_TIMEOUT_MS } from '#/constant/app';
+import { getSessionHomeDir } from '#/utils/paths';
 
 import { resolveAgentProfileSelection } from './agent-selection';
 import { isKimiV2Enabled } from './experimental-v2';
@@ -124,6 +125,7 @@ export async function runPrompt(
   };
   const harness = await createPromptHarness({
     homeDir: telemetryBootstrap.homeDir,
+    sessionHomeDir: getSessionHomeDir(),
     identity: createKimiCodeHostIdentity(version),
     uiMode: PROMPT_UI_MODE,
     skillDirs: opts.skillsDirs,

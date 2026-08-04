@@ -16,6 +16,7 @@ import {
   KIMI_CODE_CACHE_DIR_NAME,
   KIMI_CODE_DATA_DIR_NAME,
   KIMI_CODE_HOME_ENV,
+  KIMI_CODE_SESSION_HOME_ENV,
   KIMI_CODE_INPUT_HISTORY_DIR_NAME,
   KIMI_CODE_LOG_DIR_NAME,
   KIMI_CODE_PLUGIN_UPDATE_NOTICE_STATE_FILE_NAME,
@@ -37,6 +38,11 @@ export function getDataDir(): string {
     return envDir;
   }
   return join(homedir(), KIMI_CODE_DATA_DIR_NAME);
+}
+
+/** Return the optional primary session home selected by an embedding host. */
+export function getSessionHomeDir(): string | undefined {
+  return process.env[KIMI_CODE_SESSION_HOME_ENV] || undefined;
 }
 
 /**

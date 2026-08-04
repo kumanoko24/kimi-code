@@ -9,6 +9,7 @@ import {
   getDataDir,
   getInputHistoryFile,
   getLogDir,
+  getSessionHomeDir,
   getUpdateInstallStateFile,
   getUpdateStateFile,
 } from '#/utils/paths';
@@ -17,8 +18,8 @@ const originalEnv = { ...process.env };
 
 beforeEach(() => {
   delete process.env['KIMI_CODE_HOME'];
+  delete process.env['KIMI_CODE_SESSION_HOME'];
 });
-
 afterEach(() => {
   process.env = { ...originalEnv };
 });
@@ -36,6 +37,17 @@ describe('getDataDir', () => {
   it('returns KIMI_CODE_HOME even if it is a relative path', () => {
     process.env['KIMI_CODE_HOME'] = 'relative/path';
     expect(getDataDir()).toBe('relative/path');
+  });
+});
+
+describe('getSessionHomeDir', () => {
+  it('returns undefined when KIMI_CODE_SESSION_HOME is not set', () => {
+    expect(getSessionHomeDir()).toBeUndefined();
+  });
+
+  it('returns KIMI_CODE_SESSION_HOME when set', () => {
+    process.env['KIMI_CODE_SESSION_HOME'] = '/tmp/kimi-shared-sessions';
+    expect(getSessionHomeDir()).toBe('/tmp/kimi-shared-sessions');
   });
 });
 

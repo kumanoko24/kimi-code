@@ -31,6 +31,7 @@ import type {
 
 export interface SDKRpcClientOptions {
   readonly homeDir?: string;
+  readonly sessionHomeDir?: string;
   readonly configPath?: string;
   readonly identity?: KimiHostIdentity;
   readonly resolveOAuthTokenProvider?: OAuthTokenProviderResolver;
@@ -77,6 +78,7 @@ export class SDKRpcClient extends SDKRpcClientBase {
     const [coreRpc, sdkRpc] = createRPC<CoreAPI, SDKAPI>();
     this.core = new KimiCore(coreRpc, {
       homeDir: options.homeDir,
+      sessionHomeDir: options.sessionHomeDir,
       configPath: this.configPath,
       kimiRequestHeaders: this.createKimiRequestHeaders(),
       resolveOAuthTokenProvider:

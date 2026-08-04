@@ -64,7 +64,7 @@ import {
   type OAuthTokenProviderResolver
 } from '../session/provider-manager';
 import { SessionAPIImpl } from '../session/rpc';
-import { normalizeWorkDir, SessionStore } from '../session/store/index';
+import { MultiHomeSessionStore, normalizeWorkDir, SessionStore } from '../session/store/index';
 import { touchWorkspaceRegistry } from '../session/store/workspace-registry-file';
 import {
   noopTelemetryClient,
@@ -175,6 +175,12 @@ interface GlobalMcpOAuthFlow {
 
 export interface KimiCoreOptions {
   readonly homeDir?: string | undefined;
+  /**
+   * Primary home for session persistence. When it differs from `homeDir`,
+   * sessions from both homes are discoverable, new sessions land here, and
+   * mutations of existing sessions remain bound to their origin home.
+   */
+  readonly sessionHomeDir?: string | undefined;
   readonly configPath?: string | undefined;
   readonly runtime?: ToolServices | undefined;
   readonly kimiRequestHeaders?: Record<string, string> | undefined;
@@ -215,7 +221,7 @@ export class KimiCore implements PromisableMethods<CoreAPI> {
   private readonly kimiRequestHeaders: Record<string, string> | undefined;
   private readonly resolveOAuthTokenProvider: OAuthTokenProviderResolver | undefined;
   private readonly skillDirs: readonly string[];
-  private readonly sessionStore: SessionStore;
+  private readonly sessionStore: SessionStore | MultiHomeSessionStore;
   private readonly globalMcpConfig: GlobalMcpConfigStore;
   private readonly globalMcpOAuth: McpOAuthService;
   private readonly globalMcpOAuthFlows = new Map<string, GlobalMcpOAuthFlow>();
@@ -270,9 +276,13 @@ export class KimiCore implements PromisableMethods<CoreAPI> {
       this.config.experimental,
     );
     this.imageLimits = new ImageLimits(process.env, this.config.image);
-    this.sessionStore = new SessionStore(this.homeDir, {
-      resolveWorkspaceId: options.resolveWorkspaceId,
-    });
+    const sessionHomeDir = options.sessionHomeDir === undefined
+      ? this.homeDir
+      : resolveKimiHome(options.sessionHomeDir);
+    const sessionStoreOptions = { resolveWorkspaceId: options.resolveWorkspaceId };
+    this.sessionStore = sessionHomeDir === this.homeDir
+      ? new SessionStore(this.homeDir, sessionStoreOptions)
+      : new MultiHomeSessionStore(sessionHomeDir, [this.homeDir], sessionStoreOptions);
     this.globalMcpConfig = new GlobalMcpConfigStore(this.homeDir);
     this.globalMcpOAuth = new McpOAuthService({ kimiHomeDir: this.homeDir });
     this.plugins = new PluginManager({ kimiHomeDir: this.homeDir });

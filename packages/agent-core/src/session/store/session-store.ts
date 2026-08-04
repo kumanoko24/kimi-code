@@ -52,6 +52,12 @@ export interface ForkSessionRecordInput {
   readonly turnIndex?: number;
 }
 
+export interface ForkSourceSessionRecord {
+  readonly id: string;
+  readonly workDir: string;
+  readonly sessionDir: string;
+}
+
 export type SessionStoreOptions = {
   /**
    * Optional identity hook (wired by the services layer from the workspace
@@ -138,8 +144,31 @@ export class SessionStore {
   }
 
   async fork(input: ForkSessionRecordInput): Promise<SessionSummary> {
-    assertForkTurnIndex(input.turnIndex);
     const source = await this.findExistingSessionEntry(input.sourceId);
+    return this.forkFrom(input, {
+      id: source.sessionId,
+      workDir: source.workDir,
+      sessionDir: source.sessionDir,
+    });
+  }
+
+  /**
+   * Fork a source owned by another SessionStore into this store.
+   *
+   * The target always belongs to this store; the source directory remains
+   * read-only. Multi-home routing uses this to preserve a session's origin
+   * while making newly forked sessions visible from the primary home.
+   */
+  async forkFrom(
+    input: ForkSessionRecordInput,
+    source: ForkSourceSessionRecord,
+  ): Promise<SessionSummary> {
+    assertForkTurnIndex(input.turnIndex);
+    if (source.id !== input.sourceId || !(await isDirectory(source.sessionDir))) {
+      throw new KimiError(ErrorCodes.SESSION_NOT_FOUND, `Session "${input.sourceId}" was not found`, {
+        details: { sessionId: input.sourceId },
+      });
+    }
     assertSafeSessionId(input.targetId);
     const indexed = await this.findSessionEntry(input.targetId);
     if (indexed !== undefined) {

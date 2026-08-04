@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-04T19:33:29+08:00`
-- objective: add native OpenAI Responses support for GPT-5.6 Sol, Terra, and Luna through the local port 2234 gateway
-- current milestone: M5 — isolated `kiminn` installation
-- status: PASS
+- updated_at: `2026-08-05T05:18:35+08:00`
+- objective: retain native OpenAI Responses support while syncing upstream and adding isolated `kiminn` session/OAuth interoperability
+- current milestone: M6b — shared OAuth and Kimi Coding Plan models
+- status: IN PROGRESS (`M6a` PASS; `M6b` pending)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -144,6 +144,27 @@ Evidence:
 - the injected prompt identifies `/Users/noelbao/.kiminn/AGENTS.md` and `/Volumes/K/Works/kimi-code/AGENTS.md`, and enumerates workspace `.agents/skills` including `agent-core-dev`, `gen-changesets`, and `write-tui`; normal discovery also retains user `~/.agents/skills`;
 - interactive TUI session `session_03d71907-d457-4660-aadc-aa7183570c95` visibly rendered `auto`, `GPT-5.6 Sol (local 2234)`, and `thinking: xhigh` in its footer;
 - the original Kimi config, binary, and AGENTS.md checksums remain unchanged; the copied AGENTS.md snapshot matches the original at SHA-256 `e6377e8c1db1a8cc9e6537ec2a2954377a02703c91a8248f914940e1308d3e8d`.
+
+### M6a — upstream sync and shared session interoperability (PASS)
+
+Verified at `2026-08-05 05:18 UTC+8`.
+
+Success criteria:
+
+- merge current `MoonshotAI/main` without pushing to or mutating the upstream remote;
+- only an explicitly configured host (the isolated `kiminn` wrapper) discovers both session homes;
+- new sessions land in the canonical `~/.kimi-code` session home, while existing fallback sessions resume and mutate in their original directory;
+- duplicate IDs across homes fail closed, and the unsupported v2 engine fails explicitly rather than ignoring the override;
+- focused contract tests, typechecks, diff check, lint, and a checkpoint commit pass.
+
+Recovery boundary: remove `KIMI_CODE_SESSION_HOME` from the isolated wrapper and revert the M6a checkpoint. No file under `~/.kimi-code` is changed by the implementation milestone.
+
+Evidence:
+
+- merge commit `54aece9c1e8b1d80b4da963408fc50b1e01bd231` joins the prior fork work with upstream `8db7d42f23472a692eb389a0e0e5a3e18aa1b94d`;
+- a composite session-store mechanism is activated only by the SDK's optional `sessionHomeDir`; without it, the original single-home code path remains unchanged;
+- public-harness contract tests prove canonical-home creation/discovery, fallback-home resume, origin-bound rename, duplicate-ID `session.storage_conflict`, and v2 fail-closed behavior;
+- protocol, agent-core, SDK, and CLI typechecks passed; 39 SDK tests and 32 CLI tests passed; changed-file lint has zero errors (unrelated pre-existing warnings remain in untouched lines).
 
 Local recovery:
 

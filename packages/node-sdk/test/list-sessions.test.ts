@@ -29,7 +29,6 @@ afterEach(async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
-
 async function makeTempDir(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'kimi-sdk-list-'));
   tempDirs.push(dir);
@@ -330,6 +329,103 @@ describe('SessionStore.list', () => {
 });
 
 describe('KimiHarness.listSessions', () => {
+  it('creates shared-home sessions that a normal harness can discover', async () => {
+    const runtimeHome = await makeTempDir();
+    const sharedHome = await makeTempDir();
+    const workDir = await makeTempDir();
+    const kiminn = createKimiHarness({
+      identity: TEST_IDENTITY,
+      homeDir: runtimeHome,
+      sessionHomeDir: sharedHome,
+    });
+    const normal = createKimiHarness({ identity: TEST_IDENTITY, homeDir: sharedHome });
+
+    try {
+      const created = await kiminn.createSession({ id: 'ses_shared_create', workDir });
+      await kiminn.closeSession(created.id);
+
+      const sessions = await normal.listSessions({ sessionId: created.id });
+      expect(sessions[0]?.sessionDir.startsWith(join(sharedHome, 'sessions'))).toBe(true);
+    } finally {
+      await kiminn.close();
+      await normal.close();
+    }
+  });
+
+  it('resumes a fallback-home session through the combined harness', async () => {
+    const runtimeHome = await makeTempDir();
+    const sharedHome = await makeTempDir();
+    const workDir = await makeTempDir();
+    const original = createKimiHarness({ identity: TEST_IDENTITY, homeDir: runtimeHome });
+    const created = await original.createSession({ id: 'ses_fallback_resume', workDir });
+    const sessionDir = (await original.listSessions({ sessionId: created.id }))[0]!.sessionDir;
+    await original.closeSession(created.id);
+    await original.close();
+    const kiminn = createKimiHarness({
+      identity: TEST_IDENTITY,
+      homeDir: runtimeHome,
+      sessionHomeDir: sharedHome,
+    });
+
+    try {
+      const resumed = await kiminn.resumeSession({ id: created.id });
+      expect(resumed.id).toBe(created.id);
+      expect((await kiminn.listSessions({ sessionId: created.id }))[0]?.sessionDir).toBe(sessionDir);
+    } finally {
+      await kiminn.close();
+    }
+  });
+
+  it('keeps fallback-home mutations bound to the fallback directory', async () => {
+    const runtimeHome = await makeTempDir();
+    const sharedHome = await makeTempDir();
+    const workDir = await makeTempDir();
+    const original = createKimiHarness({ identity: TEST_IDENTITY, homeDir: runtimeHome });
+    const created = await original.createSession({ id: 'ses_fallback_rename', workDir });
+    const sessionDir = (await original.listSessions({ sessionId: created.id }))[0]!.sessionDir;
+    await original.closeSession(created.id);
+    await original.close();
+    const kiminn = createKimiHarness({
+      identity: TEST_IDENTITY,
+      homeDir: runtimeHome,
+      sessionHomeDir: sharedHome,
+    });
+
+    try {
+      await kiminn.renameSession({ id: created.id, title: 'Renamed in origin' });
+
+      const state = JSON.parse(
+        await readFile(join(sessionDir, 'state.json'), 'utf-8'),
+      ) as { title?: string };
+      expect(state.title).toBe('Renamed in origin');
+      expect(existsSync(join(sharedHome, 'sessions'))).toBe(false);
+    } finally {
+      await kiminn.close();
+    }
+  });
+
+  it('fails closed when the same session id exists in both homes', async () => {
+    const runtimeHome = await makeTempDir();
+    const sharedHome = await makeTempDir();
+    const workDir = await makeTempDir();
+    await new SessionStore(runtimeHome).create({ id: 'ses_home_conflict', workDir });
+    await new SessionStore(sharedHome).create({ id: 'ses_home_conflict', workDir });
+    const kiminn = createKimiHarness({
+      identity: TEST_IDENTITY,
+      homeDir: runtimeHome,
+      sessionHomeDir: sharedHome,
+    });
+
+    try {
+      await expect(kiminn.listSessions({ sessionId: 'ses_home_conflict' })).rejects.toMatchObject({
+        name: 'KimiError',
+        code: 'session.storage_conflict',
+      } satisfies Partial<KimiError>);
+    } finally {
+      await kiminn.close();
+    }
+  });
+
   it('rejects whitespace-only workDir with request.work_dir_required', async () => {
     const homeDir = await makeTempDir();
     const harness = createKimiHarness({

@@ -43,6 +43,15 @@ async function makeHarness(): Promise<{ harness: KimiHarness; homeDir: string }>
 }
 
 describe('SDKRpcClientV2 (agent-core-v2 wiring MVP)', () => {
+  it('fails closed when a separate session home is requested', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-'));
+    const sessionHomeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-session-'));
+    tempDirs.push(homeDir, sessionHomeDir);
+
+    expect(() => createKimiHarnessV2({ homeDir, sessionHomeDir, identity: TEST_IDENTITY }))
+      .toThrowError(KimiError);
+  });
+
   it('seeds the host request headers (User-Agent + X-Msh-*) into the engine', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-'));
     tempDirs.push(homeDir);
