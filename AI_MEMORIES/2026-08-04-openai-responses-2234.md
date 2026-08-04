@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-05T05:36:16+08:00`
-- objective: retain native OpenAI Responses support while syncing upstream and adding isolated `kiminn` session/OAuth interoperability
-- current milestone: M6c — isolated rebuild, config, and real RBV
-- status: PASS (`M6a`, `M6b`, and `M6c` independently PASS)
+- updated_at: `2026-08-05T06:43:27+08:00`
+- objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
+- current milestone: M7 — kiminn-only GPT subagents and resume-safe compaction
+- status: PASS (`M1` through `M7` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -219,6 +219,40 @@ Evidence:
 - desktop and mobile browser RBV of `http://127.0.0.1:2234/dashboard` passed; the UI exposes readiness, alive-session state, model/effort, safe session hashes, usage, cache, outcome, and latency without prompts, raw session IDs, credentials, emails, or account IDs;
 - final gates passed: four relevant typechecks; session-store 26 tests; SDK 64 tests; CLI 23 tests; Responses 83 tests; legacy compaction 107 passing tests plus existing skips/expected failures; v2 compaction 89 tests; native SEA smoke; and changeset status with only a patch bump for `@moonshot-ai/kimi-code`;
 - `gen-docs` could not run because its required `docs/scripts/sync-changelog.mjs` is absent from the upstream-synced tree; no replacement script or unrelated manual docs drift was introduced. The CLI-facing behavior is recorded in `.changeset/isolate-session-auth-homes.md` and this action ledger.
+
+### M7 — kiminn-only GPT subagents and resume-safe compaction (PASS)
+
+Verified at `2026-08-05 06:43 UTC+8`.
+
+Success criteria:
+
+- preserve every builtin agent profile unchanged and expose only three new isolated names: `gpt-coder-tasker`, `gpt-reviewer`, and `gpt-planner`;
+- bind the three file-defined profiles to Luna/max, Sol/xhigh, and Sol/max respectively through an opt-in mechanism that is inert for canonical Kimi;
+- make Agent and AgentSwarm share the same exact profile binding, while an explicit primary/secondary tool choice retains precedence;
+- before an already-over-window resumed conversation calls OpenAI's native compact endpoint, detect that the full compact input cannot fit and use the existing shrinking summary fallback before the next generation;
+- rebuild/install only `~/.kiminn/bin/kimi`, preserve rollback copies and canonical `~/.kimi-code` hashes, then RBV exact routing, AgentSwarm, compaction, gateway observability, and default auto/Sol/xhigh behavior.
+
+Recovery boundary: restore `/Users/noelbao/.kiminn` files from `/Users/noelbao/.kiminn/backups/gpt-subagents-20260805-062610/`; the canonical Kimi installation and configuration must require no rollback.
+
+Evidence:
+
+- builtin `coder`, `explore`, and `plan` source files are untouched; exact `model` / `thinking_effort` fields are carried only by file-defined profiles;
+- the new mechanism is gated by `agent-profile-model-binding`, default false, and the live enablement exists only in `~/.kiminn/config.toml`;
+- checkpoint commit `6808c5310` implements both engines, focused regressions, and two patch changesets without modifying a builtin agent profile;
+- installed profiles are exactly `gpt-coder-tasker` (Luna/max), `gpt-reviewer` (Sol/xhigh), and `gpt-planner` (Sol/max); their SHA-256 values are `bd921f18…`, `77c92075…`, and `05e2152d…`;
+- real Agent session `session_e3c3cef2-2c6d-42ce-8e55-e3c3f3e95ac1` spawned `gpt-coder-tasker`; the child wire records OpenAI Responses, `gpt-5.6-luna`, and `max`, then the parent returned exact `PARENT_AGENT_OK`;
+- real AgentSwarm session `session_de93c74e-4bdb-4288-8bc7-b5394a2b5dbf` spawned two `gpt-reviewer` children; both wires record OpenAI Responses, `gpt-5.6-sol`, and `xhigh`, and the parent returned exact `PARENT_SWARM_OK`;
+- real Agent session `session_9562d8e2-1954-4636-b85c-29abb9ff2089` spawned `gpt-planner`; its child wire records OpenAI Responses, `gpt-5.6-sol`, and `max`, and the parent returned exact `PARENT_PLANNER_OK`;
+- a controlled real resume used the installed binary, the live 2234 gateway, the same persisted session, and an isolated 40k test cap to reproduce the production over-window state without spending 258k tokens: native compact was skipped at `54,788 > 40,000`, summary compaction reduced `35,789` to `20,264`, `full_compaction.complete` preceded the next loop request, and the resumed turn returned exact `RESUME_COMPACT_PREFLIGHT_OK`;
+- that RBV first exposed an internal-default `max_output_tokens` request rejected truthfully by the gateway. The corrected client marks only its internal 128k compaction default as provider-optional (`maxTokens = null` on Responses); explicit model/env output caps remain hard caps and the gateway contract was not weakened or redeployed;
+- focused final suites passed: V1 169 tests plus one existing skip and V2 228 tests; both agent-core typechecks, changed-file lint with zero errors, diff check, native SEA build, native smoke, `kiminn doctor`, and changeset status passed;
+- native compact preflight logs the model, estimated input tokens, effective window, message count, and `summary_compaction` fallback without logging conversation content;
+- OpenAI's documented constraint is that the full `/responses/compact` input must itself fit the model context window, so an already-over-limit session cannot be repaired by sending the same oversized input to that endpoint;
+- the installed isolated binary SHA-256 is `f6b858368de74fac3529d737677f5dbef943453ace2aff3f74d6ea75b34b6bc4`; the wrapper remains `6729dac0…`, the isolated config remains `706a623b…`, and its interactive defaults remain auto / Sol / xhigh;
+- canonical `~/.kimi-code/bin/kimi` remains `c3009019…` and canonical `~/.kimi-code/config.toml` remains `e8e084fa…`; no canonical default mode, builtin agent, credential, or gateway artifact changed;
+- the post-RBV gateway snapshot was READY with four eligible accounts, zero in-flight requests, and a persistent ledger of 65/65 successful requests with zero failures; the local dashboard remains `http://127.0.0.1:2234/dashboard`;
+- prior M4 and M6c live evidence remains valid for Sol, Terra, and Luna image input through both the gateway and installed `kiminn`;
+- `gen-docs` remains blocked by the missing required `docs/scripts/sync-changelog.mjs`; no auto-synced changelog was edited manually.
 
 Local recovery:
 
