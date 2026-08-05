@@ -357,12 +357,23 @@ describe('KimiHarness config API', () => {
         source: 'default',
       },
       {
-        id: 'acp-v2',
-        title: 'ACP server v2 (agent-core-v2 engine)',
+        id: 'agent-profile-model-binding',
+        title: 'Exact model binding in agent files',
         description:
-          'Expose the `kimi acp-v2` sub-command that runs the Agent Client Protocol server over the experimental agent-core-v2 engine.',
+          'Let file-defined subagent profiles bind an exact model alias and thinking effort.',
         surface: 'core',
-        env: 'KIMI_CODE_EXPERIMENTAL_ACP_V2',
+        env: 'KIMI_CODE_EXPERIMENTAL_AGENT_PROFILE_MODEL_BINDING',
+        defaultEnabled: false,
+        enabled: false,
+        source: 'default',
+      },
+      {
+        id: 'openai-responses-compaction',
+        title: 'OpenAI Responses native compaction',
+        description:
+          'Use the OpenAI Responses compact endpoint and replay its opaque provider-native context unchanged.',
+        surface: 'core',
+        env: 'KIMI_CODE_EXPERIMENTAL_OPENAI_RESPONSES_COMPACTION',
         defaultEnabled: false,
         enabled: false,
         source: 'default',
