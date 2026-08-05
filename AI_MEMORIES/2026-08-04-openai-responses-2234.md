@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-05T06:43:27+08:00`
+- updated_at: `2026-08-06T07:11:43+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
-- current milestone: M7 — kiminn-only GPT subagents and resume-safe compaction
-- status: PASS (`M1` through `M7` independently PASS)
+- current milestone: M8 — upstream sync and isolated kiminn redeploy
+- status: PASS (`M1` through `M8` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -253,6 +253,34 @@ Evidence:
 - the post-RBV gateway snapshot was READY with four eligible accounts, zero in-flight requests, and a persistent ledger of 65/65 successful requests with zero failures; the local dashboard remains `http://127.0.0.1:2234/dashboard`;
 - prior M4 and M6c live evidence remains valid for Sol, Terra, and Luna image input through both the gateway and installed `kiminn`;
 - `gen-docs` remains blocked by the missing required `docs/scripts/sync-changelog.mjs`; no auto-synced changelog was edited manually.
+
+### M8 — upstream sync and isolated kiminn redeploy (PASS)
+
+Verified at `2026-08-06 07:11 UTC+8`.
+
+Success criteria:
+
+- merge the latest `MoonshotAI/main` into the fork feature branch without mutating upstream;
+- preserve the fork's OpenAI Responses flags and isolated session/OAuth mechanisms through the merge;
+- rebuild and replace only `~/.kiminn/bin/kimi`, leaving the current canonical `~/.kimi-code/bin/kimi` and isolated config untouched;
+- preserve shared canonical sessions and OAuth despite upstream making agent-core-v2 the CLI default;
+- RBV a new turn, resume, exact GPT child routing, and live 2234 observability before pushing the fork branch.
+
+Recovery boundary: restore `kimi.before`, `config.toml.before`, and `kiminn.before` from `/Users/noelbao/.kiminn/backups/upstream-sync-20260806/`. The canonical Kimi install and gateway need no rollback.
+
+Evidence:
+
+- merge commit `12dc3ae6bcaf66e48a98a9020964647be332bbd8` has parents `09443cf4199b044150b75613b96d7177ba661f31` and upstream `d1ded01b7c50c9847440f4645fe13f588becdc66`; the upstream tip is an ancestor and no upstream push occurred;
+- the only merge conflict was the legacy flag registry: obsolete upstream `acp-v2` remained deleted, while fork-only `agent-profile-model-binding` and `openai-responses-compaction` stayed registered; the SDK's public feature-metadata test was updated to cover both retained flags;
+- upstream now defaults CLI surfaces to agent-core-v2, but v2 truthfully rejects distinct `sessionHomeDir` and `authHomeDir`; the isolated wrapper therefore pins `KIMI_CODE_LEGACY_FLAG=1` so shared sessions/OAuth continue working, while canonical `kimi` retains upstream's new v2 default;
+- typechecks passed for agent-core, agent-core-v2, CLI, and node SDK; v2 import-boundary lint passed across 1,088 files; focused gates passed 169 V1 tests plus one skip, 228 V2 tests, 82 CLI tests, and 17 SDK tests;
+- the native SEA build and native smoke passed at version `0.33.0`; installed `~/.kiminn/bin/kimi` SHA-256 is `b5f7a3dbe3b7b15981d3fff48486766b6b64bf56ca8c04df10609802629f0f6e`;
+- `kiminn doctor` passed; new session `session_41f3517e-afde-4e9f-9dab-ec7ba64af98e` returned exact `KIMINN_UPSTREAM_SYNC_OK`, then resumed from canonical storage and returned exact `KIMINN_UPSTREAM_RESUME_OK`;
+- Agent RBV session `session_65a8d42f-c67c-4727-b578-84e043b5ca87` spawned `gpt-coder-tasker`; child wire facts prove provider `openai-responses`, model `gpt-5.6-luna`, alias `local-openai-2234/gpt-5.6-luna`, and effort `max`, while the parent remained Sol/xhigh and returned exact `PARENT_AGENT_OK`;
+- both RBV sessions exist under `~/.kimi-code/sessions` and not under `~/.kiminn`; the isolated config stayed SHA-256 `706a623ba8b37a7b218acea5a3eb2866faff15f1f3dfc4cfa3003c3da80cb386`;
+- the current canonical binary stayed SHA-256 `befb752584de4be1e7fb5a6ec28dbc153fef19da8787a2ceb134039b5579063f`; no canonical config, mode, session implementation, credential, or gateway artifact was changed;
+- live `127.0.0.1:2234` health and dashboard snapshot passed: gateway READY, four fresh eligible accounts, zero in-flight requests, and the latest Sol/xhigh Responses session completed 4/4 requests with HTTP 200 and a 48.1% cache-hit ratio; the local UI remains `http://127.0.0.1:2234/dashboard`;
+- unauthenticated `/pool/usage` still returns the designed `admin_auth_unavailable` response; this is not a dashboard failure because the separate loopback-only `/dashboard/api/snapshot` is the intended no-admin read surface.
 
 Local recovery:
 
