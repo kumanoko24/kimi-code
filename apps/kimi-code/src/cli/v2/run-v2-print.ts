@@ -64,6 +64,7 @@ import {
   CLI_USER_AGENT_PRODUCT,
   PROMPT_CLEANUP_TIMEOUT_MS,
 } from '#/constant/app';
+import { getAuthHomeDir, getSessionHomeDir } from '#/utils/paths';
 
 import {
   formatGoalSummaryText,
@@ -130,6 +131,8 @@ export async function runV2Print(
   const { app } = bootstrap(
     {
       homeDir,
+      authHomeDir: getAuthHomeDir(),
+      sessionHomeDir: getSessionHomeDir(),
       clientIdentity: identity,
       args: {
         requestHeaders: hostHeaders,

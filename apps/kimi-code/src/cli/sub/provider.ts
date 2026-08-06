@@ -36,6 +36,7 @@ import type { Command } from 'commander';
 
 import { createKimiCodeHostIdentity, createKimiCodeUserAgent } from '#/cli/version';
 import { fetchCatalogOrBuiltIn } from '#/utils/catalog-fetch';
+import { getAuthHomeDir, getDataDir, getSessionHomeDir } from '#/utils/paths';
 
 import { isKimiV2Enabled } from '../experimental-v2';
 
@@ -566,7 +567,12 @@ function resolveDeps(overrides: Partial<ProviderDeps> = {}): ResolvedProviderDep
         // Same engine gate as the TUI's `/provider` flow: the SDK's v2-backed
         // harness by default, the legacy agent-core harness when
         // KIMI_CODE_LEGACY_FLAG is set.
-        harness ??= (isKimiV2Enabled() ? createKimiHarnessV2 : createKimiHarness)({ identity });
+        harness ??= (isKimiV2Enabled() ? createKimiHarnessV2 : createKimiHarness)({
+          homeDir: getDataDir(),
+          authHomeDir: getAuthHomeDir(),
+          sessionHomeDir: getSessionHomeDir(),
+          identity,
+        });
         return harness;
       }),
     stdout: overrides.stdout ?? process.stdout,

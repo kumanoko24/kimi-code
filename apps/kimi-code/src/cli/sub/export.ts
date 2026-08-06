@@ -29,6 +29,7 @@ import { CLI_SHUTDOWN_TIMEOUT_MS, CLI_UI_MODE } from '#/constant/app';
 import { createCliTelemetryBootstrap, initializeCliTelemetry } from '#/cli/telemetry';
 import { detectInstallSource } from '#/cli/update/source';
 import { createKimiCodeHostIdentity } from '#/cli/version';
+import { getAuthHomeDir, getSessionHomeDir } from '#/utils/paths';
 import { detectShellEnvironment } from '#/utils/process/shell-env';
 
 import { isKimiV2Enabled } from '../experimental-v2';
@@ -159,6 +160,8 @@ function createDefaultExportDeps(overrides: Partial<ExportDeps> = {}): ExportDep
     // default, the legacy agent-core harness when KIMI_CODE_LEGACY_FLAG is set.
     harness ??= (isKimiV2Enabled() ? createKimiHarnessV2 : createKimiHarness)({
       homeDir: currentTelemetryBootstrap.homeDir,
+      authHomeDir: getAuthHomeDir(),
+      sessionHomeDir: getSessionHomeDir(),
       identity,
       telemetry: telemetryClient,
     });

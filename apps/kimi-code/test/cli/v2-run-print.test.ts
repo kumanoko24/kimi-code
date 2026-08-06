@@ -311,6 +311,23 @@ describe('runV2Print', () => {
     expect(input.args?.skillDirs).toEqual(['/skills']);
   });
 
+  it('passes split auth and session homes into the native v2 bootstrap', async () => {
+    vi.stubEnv('KIMI_CODE_AUTH_HOME', '/tmp/kimi-shared-auth');
+    vi.stubEnv('KIMI_CODE_SESSION_HOME', '/tmp/kimi-shared-sessions');
+    const stdout = writer();
+    const stderr = writer();
+    const { app, agent } = makeFakeHarness();
+
+    mocks.bootstrap.mockReturnValue({ app });
+    mocks.ensureMainAgent.mockResolvedValue(agent);
+
+    await runV2Print(opts() as never, '1.2.3-test', { stdout, stderr });
+
+    const input = mocks.bootstrap.mock.calls[0]?.[0] as BootstrapInput;
+    expect(input.authHomeDir).toBe('/tmp/kimi-shared-auth');
+    expect(input.sessionHomeDir).toBe('/tmp/kimi-shared-sessions');
+  });
+
   it('leaves the skill dirs arg unset when --skillsDir is empty', async () => {
     const stdout = writer();
     const stderr = writer();

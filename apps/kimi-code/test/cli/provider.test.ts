@@ -1144,12 +1144,20 @@ describe('kimi provider engine routing', () => {
 
   it('builds the v2 harness by default', async () => {
     vi.stubEnv('KIMI_CODE_LEGACY_FLAG', '');
+    vi.stubEnv('KIMI_CODE_AUTH_HOME', '/tmp/kimi-shared-auth');
+    vi.stubEnv('KIMI_CODE_SESSION_HOME', '/tmp/kimi-shared-sessions');
     const program = new Command('kimi');
     registerWithDefaultHarness(program);
 
     await program.parseAsync(['node', 'kimi', 'provider', 'list'], { from: 'node' });
 
     expect(harnessRouting.kimiHarnessV2Constructor).toHaveBeenCalledTimes(1);
+    expect(harnessRouting.kimiHarnessV2Constructor).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authHomeDir: '/tmp/kimi-shared-auth',
+        sessionHomeDir: '/tmp/kimi-shared-sessions',
+      }),
+    );
     expect(harnessRouting.kimiHarnessConstructor).not.toHaveBeenCalled();
   });
 
