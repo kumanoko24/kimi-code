@@ -79,19 +79,14 @@ import { ITelemetryService } from '#/app/telemetry/telemetry';
 import { Error2, ErrorCodes } from '#/errors';
 import { recordingTelemetry, type TelemetryRecord } from '../../app/telemetry/stubs';
 import { stubLog } from '../../_base/log/stubs';
+import { stubBootstrap } from '../../app/bootstrap/stubs';
 
 function bootstrapStub(): IBootstrapService {
-  return {
-    homeDir: '/tmp',
-    scope: (name: string) => name,
-  } as unknown as IBootstrapService;
+  return stubBootstrap('/tmp');
 }
 
 function tmpBootstrapStub(root: string): IBootstrapService {
-  return {
-    homeDir: root,
-    scope: (name: string) => name,
-  } as unknown as IBootstrapService;
+  return stubBootstrap(root);
 }
 
 function cronStoreStub(
@@ -291,6 +286,7 @@ function sessionIndexStub(): ISessionIndex {
     status: () => ({ state: 'uninitialized', degradedCount: 0 }),
     listRecent: () => Promise.resolve({ items: [] }),
     get: () => Promise.resolve(undefined),
+    locate: () => Promise.resolve(undefined),
     count: () => Promise.resolve(0),
     remove: () => Promise.resolve(),
   };
@@ -315,6 +311,10 @@ function sessionIndexWithSummary(
     status: () => ({ state: 'uninitialized', degradedCount: 0 }),
     listRecent: () => Promise.resolve({ items: [summary] }),
     get: (id) => Promise.resolve(id === sessionId ? summary : undefined),
+    locate: (id) =>
+      Promise.resolve(
+        id === sessionId ? { summary, sessionsScope: 'sessions' } : undefined,
+      ),
     count: () => Promise.resolve(1),
     remove: () => Promise.resolve(),
   };
@@ -760,13 +760,19 @@ describe('SessionLifecycleService', () => {
   it('registers the workspace during create so a cold resume can resolve the workdir', async () => {
     const workDir = '/tmp/proj';
     const workspaces = persistentWorkspaceStub();
-    const sessionIndex = sessionIndexWithSummary('s1', workDir);
+    const persisted = sessionIndexWithSummary('s1', workDir);
+    let created = false;
+    const sessionIndex: ISessionIndex = {
+      ...persisted,
+      locate: (id) => (created ? persisted.locate(id) : Promise.resolve(undefined)),
+    };
     const first = await build([
       stubPair(IWorkspaceService, workspaces),
       stubPair(ISessionIndex, sessionIndex),
     ]);
 
     await first.create({ sessionId: 's1', workDir });
+    created = true;
     await expect(workspaces.get(encodeWorkDirKey(workDir))).resolves.toMatchObject({
       root: workDir,
     });
@@ -1112,7 +1118,8 @@ describe('SessionLifecycleService', () => {
     const svc = await build([
       stubPair(ISessionIndex, {
         ...sessionIndexStub(),
-        get: () => Promise.reject(new Error2(ErrorCodes.SESSION_NOT_FOUND, 'index read failed')),
+        locate: () =>
+          Promise.reject(new Error2(ErrorCodes.SESSION_NOT_FOUND, 'index read failed')),
       }),
     ]);
 
@@ -1127,7 +1134,7 @@ describe('SessionLifecycleService', () => {
     const svc = await build([
       stubPair(ISessionIndex, {
         ...sessionIndexStub(),
-        get: () => Promise.reject(new TypeError('bad index')),
+        locate: () => Promise.reject(new TypeError('bad index')),
       }),
     ]);
 
@@ -1456,6 +1463,7 @@ describe('SessionLifecycleService', () => {
         stubPair(ISessionIndex, {
           ...sessionIndexStub(),
           get: () => Promise.resolve(summary),
+          locate: () => Promise.resolve({ summary, sessionsScope: 'sessions' }),
         }),
         stubPair(IAgentLifecycleService, {
           ...agentLifecycleStub(),
@@ -1682,6 +1690,7 @@ describe('SessionLifecycleService', () => {
         stubPair(ISessionIndex, {
           ...sessionIndexStub(),
           get: () => Promise.resolve(summary),
+          locate: () => Promise.resolve({ summary, sessionsScope: 'sessions' }),
         }),
       ]);
 

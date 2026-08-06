@@ -409,24 +409,8 @@ export class SDKRpcClientV2 extends SDKRpcClientBase {
     this.identity =
       options.identity === undefined ? undefined : assertKimiHostIdentity(options.identity);
     this.homeDir = resolveKimiHome(options.homeDir);
-    if (
-      options.authHomeDir !== undefined &&
-      resolveKimiHome(options.authHomeDir) !== this.homeDir
-    ) {
-      throw new KimiError(
-        ErrorCodes.CONFIG_INVALID,
-        'authHomeDir is supported only by the v1 session engine',
-      );
-    }
-    if (
-      options.sessionHomeDir !== undefined &&
-      resolveKimiHome(options.sessionHomeDir) !== this.homeDir
-    ) {
-      throw new KimiError(
-        ErrorCodes.CONFIG_INVALID,
-        'sessionHomeDir is supported only by the v1 session engine',
-      );
-    }
+    const authHomeDir = resolveKimiHome(options.authHomeDir ?? this.homeDir);
+    const sessionHomeDir = resolveKimiHome(options.sessionHomeDir ?? this.homeDir);
     this.configPath = resolveConfigPath({
       homeDir: this.homeDir,
       configPath: options.configPath,
@@ -434,8 +418,9 @@ export class SDKRpcClientV2 extends SDKRpcClientBase {
     ensureKimiHome(this.homeDir);
     this.telemetry = options.telemetry ?? noopTelemetryClient;
     this.auth = new KimiAuthFacade({
-      homeDir: this.homeDir,
+      homeDir: authHomeDir,
       configPath: this.configPath,
+      credentialsReadOnly: authHomeDir !== this.homeDir,
       identity: this.identity,
       onRefresh: options.onOAuthRefresh,
     });
@@ -444,6 +429,8 @@ export class SDKRpcClientV2 extends SDKRpcClientBase {
     const { app } = bootstrap(
       {
         homeDir: this.homeDir,
+        authHomeDir,
+        sessionHomeDir,
         configPath: this.configPath,
         clientIdentity: identity,
         args: {
@@ -998,6 +985,7 @@ export class SDKRpcClientV2 extends SDKRpcClientBase {
       sessionId: input.sessionId,
     });
     const bootstrapService = this.engineAccessor.get(IBootstrapService);
+    const sessionIndex = this.engineAccessor.get(ISessionIndex);
     const workspacesById = new Map(
       (await this.klient.global.workspaces.list()).map((workspace) => [workspace.id, workspace]),
     );
@@ -1008,12 +996,14 @@ export class SDKRpcClientV2 extends SDKRpcClientBase {
       // workspace) cannot be resumed on either engine; v1's store never lists
       // one in the first place, so drop it here too.
       if (workDir === undefined) continue;
+      const location = await sessionIndex.locate(item.id);
+      if (location === undefined) continue;
       summaries.push(
         v2SummaryToSessionSummary(item, {
           workDir,
           sessionDir: sessionDirOf(
             bootstrapService.homeDir,
-            workspacePersistenceScope(bootstrapService.scope('sessions'), item.workspaceId),
+            workspacePersistenceScope(location.sessionsScope, item.workspaceId),
             item.id,
           ),
         }),

@@ -7,11 +7,13 @@
  */
 
 import type { ServiceRegistration } from '#/_base/di/test';
+import { join, relative } from 'pathe';
 import {
   IBootstrapService,
   resolveHostArgs,
   type HostArgsInput,
   type PersistenceScopeName,
+  type SessionStorageRoot,
 } from '#/app/bootstrap/bootstrap';
 
 export const stubClientIdentity = {
@@ -24,10 +26,24 @@ export function stubBootstrap(
   homeDir = '/tmp/kimi-home',
   env: NodeJS.ProcessEnv = {},
   args: HostArgsInput = {},
+  homes: { readonly authHomeDir?: string; readonly sessionHomeDir?: string } = {},
 ): IBootstrapService {
+  const authHomeDir = homes.authHomeDir ?? homeDir;
+  const sessionHomeDir = homes.sessionHomeDir ?? homeDir;
+  const roots: SessionStorageRoot[] = [sessionHomeDir, ...(sessionHomeDir === homeDir ? [] : [homeDir])].map(
+    (rootHomeDir) => {
+      const homeScope = relative(homeDir, rootHomeDir);
+      return {
+        homeDir: rootHomeDir,
+        homeScope: homeScope === '.' ? '' : homeScope,
+        sessionsDir: join(rootHomeDir, 'sessions'),
+        sessionsScope: relative(homeDir, join(rootHomeDir, 'sessions')),
+      };
+    },
+  );
   const scopes: Record<PersistenceScopeName, string> = {
     config: '',
-    sessions: 'sessions',
+    sessions: roots[0]!.sessionsScope,
     blobs: 'blobs',
     store: 'store',
     logs: 'logs',
@@ -42,11 +58,14 @@ export function stubBootstrap(
     cwd: '/tmp',
     osHomeDir: '/home/test',
     homeDir,
+    authHomeDir,
+    authCredentialsReadOnly: authHomeDir !== homeDir,
     configPath: `${homeDir}/config.toml`,
     configKey: 'config.toml',
     clientIdentity: stubClientIdentity,
     args: resolveHostArgs(args),
-    sessionsDir: `${homeDir}/sessions`,
+    sessionStorageRoots: roots,
+    sessionsDir: roots[0]!.sessionsDir,
     blobsDir: `${homeDir}/blobs`,
     storeDir: `${homeDir}/store`,
     cacheDir: `${homeDir}/cache`,

@@ -79,15 +79,18 @@ describe('FileSessionIndex (legacy)', () => {
     await fsp.rm(homeDir, { recursive: true, force: true });
   });
 
-  function build(): ISessionIndex {
+  function build(options: { readonly sessionHomeDir?: string; readonly readModel?: boolean } = {}): ISessionIndex {
     const fileStorage = new FileStorageService(homeDir);
     const host = createScopedTestHost([
       stubPair(IFileSystemStorageService, fileStorage),
       stubPair(IAtomicDocumentStore, new JsonAtomicDocumentStore(fileStorage)),
-      stubPair(IBootstrapService, stubBootstrap(homeDir)),
+      stubPair(
+        IBootstrapService,
+        stubBootstrap(homeDir, {}, {}, { sessionHomeDir: options.sessionHomeDir }),
+      ),
       stubPair(IQueryStore, stubQueryStore()),
       stubPair(ISessionIndexMirror, stubSessionIndexMirror()),
-      stubPair(IFlagService, stubFlag(false)),
+      stubPair(IFlagService, stubFlag(options.readModel ?? false)),
       stubPair(ILogService, stubLog()),
     ]);
     disposeHost = () => {
@@ -109,6 +112,44 @@ describe('FileSessionIndex (legacy)', () => {
   async function seedEmpty(sessionId: string, wsId: string = workspaceId): Promise<void> {
     await fsp.mkdir(join(sessionsDir, wsId, sessionId), { recursive: true });
   }
+
+  async function seedSessionAt(
+    rootHomeDir: string,
+    sessionId: string,
+    meta: Record<string, unknown>,
+  ): Promise<void> {
+    const dir = join(rootHomeDir, 'sessions', workspaceId, sessionId, 'session-meta');
+    await fsp.mkdir(dir, { recursive: true });
+    await fsp.writeFile(join(dir, 'state.json'), JSON.stringify(meta));
+  }
+
+  it('merges primary and fallback homes and reports each owner', async () => {
+    const primaryHome = join(homeDir, 'canonical');
+    await seedSessionAt(primaryHome, 'primary', { updatedAt: 2 });
+    await seedSessionAt(homeDir, 'fallback', { updatedAt: 1 });
+
+    const store = build({ sessionHomeDir: primaryHome, readModel: true });
+
+    expect((await store.listRecent({ workspaceIds: [workspaceId] })).items.map((item) => item.id))
+      .toEqual(['primary', 'fallback']);
+    await expect(store.locate('primary')).resolves.toMatchObject({
+      sessionsScope: 'canonical/sessions',
+    });
+    await expect(store.locate('fallback')).resolves.toMatchObject({ sessionsScope: 'sessions' });
+    expect(store.status()).toMatchObject({ state: 'uninitialized' });
+  });
+
+  it('rejects a session id duplicated across homes', async () => {
+    const primaryHome = join(homeDir, 'canonical');
+    await seedSessionAt(primaryHome, 'duplicate', { updatedAt: 2 });
+    await seedSessionAt(homeDir, 'duplicate', { updatedAt: 1 });
+
+    const store = build({ sessionHomeDir: primaryHome });
+
+    await expect(store.locate('duplicate')).rejects.toMatchObject({
+      code: 'session.storage_conflict',
+    });
+  });
 
   it('listRecent returns non-archived sessions by default', async () => {
     await seedSession('active', { createdAt: 1, updatedAt: 2 });

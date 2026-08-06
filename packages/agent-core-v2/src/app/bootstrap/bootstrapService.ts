@@ -20,6 +20,7 @@ import {
   IBootstrapService,
   type HostArgs,
   type PersistenceScopeName,
+  type SessionStorageRoot,
 } from './bootstrap';
 
 export class BootstrapService implements IBootstrapService {
@@ -30,9 +31,12 @@ export class BootstrapService implements IBootstrapService {
   readonly cwd: string;
   readonly osHomeDir: string;
   readonly homeDir: string;
+  readonly authHomeDir: string;
+  readonly authCredentialsReadOnly: boolean;
   readonly configPath: string;
   readonly clientIdentity: KimiHostIdentity;
   readonly args: HostArgs;
+  readonly sessionStorageRoots: readonly SessionStorageRoot[];
   readonly sessionsDir: string;
   readonly blobsDir: string;
   readonly storeDir: string;
@@ -50,10 +54,13 @@ export class BootstrapService implements IBootstrapService {
     this.osHomeDir = options.osHomeDir;
     this.env = options.env;
     this.homeDir = options.homeDir;
+    this.authHomeDir = options.authHomeDir;
+    this.authCredentialsReadOnly = options.authCredentialsReadOnly;
     this.configPath = options.configPath;
     this.clientIdentity = options.clientIdentity;
     this.args = options.args;
-    this.sessionsDir = join(options.homeDir, 'sessions');
+    this.sessionStorageRoots = options.sessionStorageRoots;
+    this.sessionsDir = options.sessionStorageRoots[0]!.sessionsDir;
     this.blobsDir = join(options.homeDir, 'blobs');
     this.storeDir = join(options.homeDir, 'store');
     this.cacheDir = join(options.homeDir, 'cache');
@@ -61,7 +68,7 @@ export class BootstrapService implements IBootstrapService {
     this.configKey = basename(options.configPath);
     this.scopes = {
       config: '',
-      sessions: relative(options.homeDir, join(options.homeDir, 'sessions')),
+      sessions: options.sessionStorageRoots[0]!.sessionsScope,
       blobs: relative(options.homeDir, this.blobsDir),
       store: relative(options.homeDir, this.storeDir),
       logs: relative(options.homeDir, this.logsDir),

@@ -24,6 +24,28 @@ export KIMI_CODE_HOME="/path/to/custom/kimi-code"
 
 数据目录的完整结构见[数据路径](./data-locations.md)。
 
+### `KIMI_CODE_SESSION_HOME`
+
+只覆盖会话历史的主目录。新建和分支会话写入该目录；原本的 `KIMI_CODE_HOME` 仍作为回退来源，用于列出和恢复设置覆盖前创建的会话：
+
+```sh
+export KIMI_CODE_HOME="$HOME/.kimi-isolated"
+export KIMI_CODE_SESSION_HOME="$HOME/.kimi-code"
+```
+
+后续修改会留在原本存放该会话的目录；恢复旧会话不会迁移它。如果两个目录中出现相同的会话 id，CLI 会报告存储冲突，不会擅自选择其中一份。
+
+### `KIMI_CODE_AUTH_HOME`
+
+只覆盖 OAuth 凭据所使用的 home。独立 profile 可以复用现有 Kimi Code 登录态，同时不共享其 `config.toml`、Skills、`agents/` 或其他 profile 数据：
+
+```sh
+export KIMI_CODE_HOME="$HOME/.kimi-isolated"
+export KIMI_CODE_AUTH_HOME="$HOME/.kimi-code"
+```
+
+当 auth home 与 `KIMI_CODE_HOME` 不同时，独立 profile 可以使用并自动刷新借用的凭据，但 `/login` 和 `/logout` 不能替换或删除它们。请从拥有 `KIMI_CODE_AUTH_HOME` 的 profile 管理该登录态。
+
 ### `KIMI_DISABLE_TELEMETRY`
 
 设为 `1` 关闭匿名遥测上报（也接受 `true`/`yes`/`y`，不区分大小写）：
@@ -121,6 +143,8 @@ kimi
 | 环境变量 | 用途 | 合法值 |
 | --- | --- | --- |
 | `KIMI_DISABLE_TELEMETRY` | 关闭匿名遥测上报 | `1`、`true`、`yes`、`y`（不区分大小写） |
+| `KIMI_CODE_SESSION_HOME` | 新会话历史的主目录；路径不同时，`KIMI_CODE_HOME` 仍作为读取/恢复的回退来源 | 目录路径 |
+| `KIMI_CODE_AUTH_HOME` | OAuth 凭据使用的目录；借用其他目录时会保护 `/login` / `/logout` 写操作 | 目录路径 |
 | `KIMI_CODE_BACKGROUND_KEEP_ALIVE_ON_EXIT` | 会话关闭时是否保留后台任务，优先级高于 `config.toml`。默认会在退出时停止后台任务 | 真值：`1`/`true`/`yes`/`on`；假值：`0`/`false`/`no`/`off` |
 | `KIMI_CODE_BACKGROUND_MAX_RUNNING_TASKS` | 同时运行的后台任务数上限，优先级高于 `config.toml` 的 `[background] max_running_tasks`（不设置表示无上限） | 正整数；非法值被忽略 |
 | `KIMI_IMAGE_MAX_EDGE_PX` | 图片压缩的最长边上限（像素），优先级高于 `config.toml` 的 `[image] max_edge_px`（默认 `2000`） | 正整数；非法值被忽略 |

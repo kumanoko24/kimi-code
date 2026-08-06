@@ -72,8 +72,8 @@ export class SessionExportService implements ISessionExportService {
       );
     }
 
-    const summary = await this.index.get(input.sessionId);
-    if (summary === undefined) {
+    const location = await this.index.locate(input.sessionId);
+    if (location === undefined) {
       throw new Error2(
         ErrorCodes.SESSION_NOT_FOUND,
         `Session "${input.sessionId}" does not exist`,
@@ -81,7 +81,7 @@ export class SessionExportService implements ISessionExportService {
       );
     }
 
-    const liveSummary = await this.flushLiveSession(summary);
+    const liveSummary = await this.flushLiveSession(location.summary, location.sessionsScope);
     options.signal?.throwIfAborted();
     if (input.includeGlobalLog === true) {
       await this.warnIfFails('export global log flush failed', () => this.log.flush(), {
@@ -103,11 +103,14 @@ export class SessionExportService implements ISessionExportService {
     });
   }
 
-  private async flushLiveSession(summary: SessionSummary): Promise<ExportSessionDirectorySummary> {
+  private async flushLiveSession(
+    summary: SessionSummary,
+    sessionsScope: string,
+  ): Promise<ExportSessionDirectorySummary> {
     const workspace = await this.workspaces.get(summary.workspaceId);
     const sessionDir = sessionDirOf(
       this.bootstrap.homeDir,
-      workspacePersistenceScope(this.bootstrap.scope('sessions'), summary.workspaceId),
+      workspacePersistenceScope(sessionsScope, summary.workspaceId),
       summary.id,
     );
     let exportSummary: ExportSessionDirectorySummary = {

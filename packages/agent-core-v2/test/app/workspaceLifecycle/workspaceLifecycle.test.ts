@@ -51,6 +51,7 @@ import { IWorkspaceToolPolicy } from '#/workspace/workspaceToolPolicy/workspaceT
 import { WorkspaceToolPolicyService } from '#/workspace/workspaceToolPolicy/workspaceToolPolicyService';
 import { recordingTelemetry, type TelemetryRecord } from '../telemetry/stubs';
 import { stubLog } from '../../_base/log/stubs';
+import { stubBootstrap } from '../bootstrap/stubs';
 
 import { IWorkspaceLifecycleService } from '#/app/workspaceLifecycle/workspaceLifecycle';
 import { WorkspaceLifecycleService } from '#/app/workspaceLifecycle/workspaceLifecycleService';
@@ -61,10 +62,7 @@ import {
 } from '#/app/workspaceLifecycle/sessionLookup';
 
 function bootstrapStub(): IBootstrapService {
-  return {
-    homeDir: '/tmp',
-    scope: (name: string) => name,
-  } as unknown as IBootstrapService;
+  return stubBootstrap('/tmp');
 }
 
 function hostEnvironmentStub(): IHostEnvironment {
@@ -109,6 +107,7 @@ function sessionIndexStub(): ISessionIndex {
     prepare: () => Promise.resolve({ state: 'ready', generation: 0, degradedCount: 0 }),
     status: () => ({ state: 'ready', generation: 0, degradedCount: 0 }),
     get: () => Promise.resolve(undefined),
+    locate: () => Promise.resolve(undefined),
     listRecent: () => Promise.resolve({ items: [] }),
     count: () => Promise.resolve(0),
     remove: () => Promise.resolve(),
@@ -471,9 +470,14 @@ describe('WorkspaceLifecycleService', () => {
       readonly workspaceId: string;
       readonly cwd?: string;
     }): ReturnType<typeof stubPair> {
+      const stored = { ...summary, createdAt: 1, updatedAt: 1, archived: false };
       return stubPair(ISessionIndex, {
         ...sessionIndexStub(),
-        get: (id: string) => Promise.resolve(id === summary.id ? { ...summary, createdAt: 1, updatedAt: 1, archived: false } : undefined),
+        get: (id: string) => Promise.resolve(id === summary.id ? stored : undefined),
+        locate: (id: string) =>
+          Promise.resolve(
+            id === summary.id ? { summary: stored, sessionsScope: 'sessions' } : undefined,
+          ),
       } as unknown as ISessionIndex);
     }
 

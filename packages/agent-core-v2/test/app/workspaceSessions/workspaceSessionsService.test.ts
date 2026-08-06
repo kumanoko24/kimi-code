@@ -45,6 +45,10 @@ class FakeSessionIndex implements ISessionIndex {
     return undefined;
   }
 
+  async locate(_id: string) {
+    return undefined;
+  }
+
   async count(query: SessionCountQuery): Promise<number> {
     this.lastCountQuery = query;
     return this.countResult;

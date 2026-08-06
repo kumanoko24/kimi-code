@@ -36,7 +36,7 @@ import { IUserAgentProfileLoader } from '#/workspace/workspaceAgentProfileLoader
 import { UserAgentProfileLoaderService } from '#/workspace/workspaceAgentProfileLoader/userAgentProfileLoaderService';
 import { IPluginAgentProfileLoader } from '#/workspace/workspaceAgentProfileLoader/pluginAgentProfileLoader';
 import { PluginAgentProfileLoaderService } from '#/workspace/workspaceAgentProfileLoader/pluginAgentProfileLoaderService';
-import { IBootstrapService, resolveHostArgs } from '#/app/bootstrap/bootstrap';
+import { IBootstrapService } from '#/app/bootstrap/bootstrap';
 import { IConfigService } from '#/app/config/config';
 import { ICronTaskPersistence } from '#/app/cron/cronTaskPersistence';
 import { IEventService } from '#/app/event/event';
@@ -104,6 +104,7 @@ import { IPluginSkillSource, PluginSkillSource } from '#/workspace/workspaceSkil
 import { IWorkspaceRootSkillSource, WorkspaceRootSkillSource } from '#/workspace/workspaceSkillCatalog/rootFileSkillSource';
 
 import { stubLog } from '../_base/log/stubs';
+import { stubBootstrap } from '../app/bootstrap/stubs';
 import { stubSkill } from '../app/skillCatalog/stubs';
 import { stdioFixture } from '../mcpCore/stubs';
 
@@ -275,13 +276,7 @@ describe('workspace resource sharing (handler chain)', () => {
 
   function buildHost(discovery: ISkillDiscovery, homeDir: string): void {
     host = createScopedTestHost([
-      stubPair(IBootstrapService, {
-        _serviceBrand: undefined,
-        homeDir,
-        osHomeDir: homeDir,
-        args: resolveHostArgs(undefined),
-        scope: (name: string) => name,
-      } as unknown as IBootstrapService),
+      stubPair(IBootstrapService, { ...stubBootstrap(homeDir), osHomeDir: homeDir }),
       stubPair(IHostEnvironment, {
         _serviceBrand: undefined,
         osKind: 'Linux',
@@ -305,6 +300,7 @@ describe('workspace resource sharing (handler chain)', () => {
         _serviceBrand: undefined,
         list: () => Promise.resolve({ items: [], total: 0, hasMore: false }),
         get: () => Promise.resolve(undefined),
+        locate: () => Promise.resolve(undefined),
         countActive: () => Promise.resolve(0),
       } as unknown as ISessionIndex),
       stubPair(IAppendLogStore, {

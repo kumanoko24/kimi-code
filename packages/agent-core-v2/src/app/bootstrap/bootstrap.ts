@@ -20,7 +20,7 @@
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 
-import { join } from 'pathe';
+import { join, relative } from 'pathe';
 
 import type { KimiHostIdentity } from '@moonshot-ai/kimi-code-oauth';
 
@@ -86,6 +86,9 @@ export function resolveHostArgs(input: HostArgsInput | undefined): HostArgs {
 
 export interface IBootstrapOptions {
   readonly homeDir: string;
+  readonly authHomeDir: string;
+  readonly authCredentialsReadOnly: boolean;
+  readonly sessionStorageRoots: readonly SessionStorageRoot[];
   readonly configPath: string;
   readonly osHomeDir: string;
   readonly platform: NodeJS.Platform;
@@ -94,6 +97,17 @@ export interface IBootstrapOptions {
   readonly env: NodeJS.ProcessEnv;
   readonly clientIdentity: KimiHostIdentity;
   readonly args: HostArgs;
+}
+
+export interface SessionStorageRoot {
+  /** Absolute Kimi home owning this session tree. */
+  readonly homeDir: string;
+  /** Storage scope addressing the owning home from the runtime home. */
+  readonly homeScope: string;
+  /** Absolute directory containing workspace session buckets. */
+  readonly sessionsDir: string;
+  /** Storage scope addressing the sessions directory from the runtime home. */
+  readonly sessionsScope: string;
 }
 
 export const IBootstrapOptions: ServiceIdentifier<IBootstrapOptions> =
@@ -117,10 +131,16 @@ export interface IBootstrapService {
   readonly cwd: string;
   readonly osHomeDir: string;
   readonly homeDir: string;
+  /** Home used for OAuth credential IO. */
+  readonly authHomeDir: string;
+  /** Explicit login/logout must not mutate credentials borrowed from another home. */
+  readonly authCredentialsReadOnly: boolean;
   readonly configPath: string;
   readonly clientIdentity: KimiHostIdentity;
   /** Host invocation arguments; see {@link HostArgs}. */
   readonly args: HostArgs;
+  /** Primary session root first, followed by read/resume fallbacks. */
+  readonly sessionStorageRoots: readonly SessionStorageRoot[];
   readonly sessionsDir: string;
   readonly blobsDir: string;
   readonly storeDir: string;
@@ -136,6 +156,10 @@ export const IBootstrapService: ServiceIdentifier<IBootstrapService> =
 
 export interface BootstrapInput {
   readonly homeDir?: string;
+  /** OAuth credential home; defaults to `homeDir`. */
+  readonly authHomeDir?: string;
+  /** Primary session home; defaults to `homeDir`. A distinct runtime home remains a fallback. */
+  readonly sessionHomeDir?: string;
   readonly configPath?: string;
   readonly env?: NodeJS.ProcessEnv;
   readonly osHomeDir?: string;
@@ -153,9 +177,21 @@ export function resolveBootstrapOptions(input: BootstrapInput): IBootstrapOption
   const env = input.env ?? process.env;
   const osHomeDir = input.osHomeDir ?? homedir();
   const homeDir = resolveKimiHome(input.homeDir, env, osHomeDir);
+  const authHomeDir = resolveKimiHome(input.authHomeDir ?? homeDir, env, osHomeDir);
+  const sessionHomeDir = resolveKimiHome(input.sessionHomeDir ?? homeDir, env, osHomeDir);
   const configPath = input.configPath ?? join(homeDir, 'config.toml');
+  const sessionHomeDirs = sessionHomeDir === homeDir ? [sessionHomeDir] : [sessionHomeDir, homeDir];
+  const sessionStorageRoots = sessionHomeDirs.map((rootHomeDir): SessionStorageRoot => ({
+    homeDir: rootHomeDir,
+    homeScope: relativeScope(homeDir, rootHomeDir),
+    sessionsDir: join(rootHomeDir, 'sessions'),
+    sessionsScope: relativeScope(homeDir, join(rootHomeDir, 'sessions')),
+  }));
   return {
     homeDir,
+    authHomeDir,
+    authCredentialsReadOnly: authHomeDir !== homeDir,
+    sessionStorageRoots,
     configPath,
     osHomeDir,
     platform: input.platform ?? process.platform,
@@ -165,6 +201,11 @@ export function resolveBootstrapOptions(input: BootstrapInput): IBootstrapOption
     clientIdentity: input.clientIdentity,
     args: resolveHostArgs(input.args),
   };
+}
+
+function relativeScope(from: string, to: string): string {
+  const scope = relative(from, to);
+  return scope === '.' ? '' : scope;
 }
 
 export function bootstrapSeed(input: BootstrapInput): ScopeSeed {

@@ -52,6 +52,12 @@ export interface SessionSummary {
   readonly custom?: Record<string, unknown>;
 }
 
+/** Authoritative persistence owner for a session id. */
+export interface SessionLocation {
+  readonly summary: SessionSummary;
+  readonly sessionsScope: string;
+}
+
 export interface SessionListQuery {
   /**
    * Restrict to sessions persisted under any of these workspace ids. A single
@@ -100,6 +106,8 @@ export interface ISessionIndex {
   prepare(options?: { deadlineMs?: number }): Promise<SessionIndexStatus>;
   status(): SessionIndexStatus;
   get(id: string): Promise<SessionSummary | undefined>;
+  /** Resolve the one authoritative storage root owning `id`. */
+  locate(id: string): Promise<SessionLocation | undefined>;
   /** Recency-ordered keyset page over the persisted session set. */
   listRecent(query: SessionListQuery): Promise<Page<SessionSummary>>;
   /** Materialized count over the given workspace-id set. */

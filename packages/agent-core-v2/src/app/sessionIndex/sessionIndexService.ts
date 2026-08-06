@@ -53,6 +53,7 @@ import {
   type QueryFilter,
 } from '#/persistence/interface/queryStore';
 import { IFileSystemStorageService } from '#/persistence/interface/storage';
+import { Error2, ErrorCodes } from '#/errors';
 
 import {
   CHILD_SESSION_KIND,
@@ -64,6 +65,7 @@ import {
   type SessionIndexStatus,
   type SessionIndexState,
   type SessionListQuery,
+  type SessionLocation,
   type SessionSummary,
 } from './sessionIndex';
 import {
@@ -136,6 +138,11 @@ export class FileSessionIndex extends Disposable implements ISessionIndex {
       log,
       sessionsScope: bootstrap.scope('sessions'),
     });
+    if (bootstrap.sessionStorageRoots.length > 1) {
+      this.log.info('session index multi-home mode; serving authoritative scans', {
+        sessionHomeCount: bootstrap.sessionStorageRoots.length,
+      });
+    }
   }
 
   /** The reconcile loop runs only while the read model is in play — starting
@@ -310,6 +317,10 @@ export class FileSessionIndex extends Disposable implements ISessionIndex {
       (generation) => this.getFromReadModel(generation, id),
       () => this.getLegacy(id),
     );
+  }
+
+  async locate(id: string): Promise<SessionLocation | undefined> {
+    return this.locateLegacy(id);
   }
 
   async listRecent(query: SessionListQuery): Promise<Page<SessionSummary>> {
@@ -620,10 +631,6 @@ export class FileSessionIndex extends Disposable implements ISessionIndex {
 
   // ---- authoritative (legacy) path --------------------------------------------
 
-  private get sessionsScope(): string {
-    return this.bootstrap.scope('sessions');
-  }
-
   private async listLegacy(query: SessionListQuery): Promise<Page<SessionSummary>> {
     if (query.sessionId !== undefined) {
       const summary = await this.getLegacy(query.sessionId);
@@ -634,18 +641,12 @@ export class FileSessionIndex extends Disposable implements ISessionIndex {
       return { items: query.limit !== undefined ? items.slice(0, query.limit) : items };
     }
 
-    const workspaceIds = query.workspaceIds ?? (await listWorkspaceIds(this.storage, this.sessionsScope));
-    const collected: SessionSummary[] = [];
-    for (const workspaceId of workspaceIds) {
-      for (const sessionId of await listSessionIds(this.storage, this.sessionsScope, workspaceId)) {
-        const summary = await readSessionSummary(this.docs, this.sessionsScope, workspaceId, sessionId);
-        if (summary === undefined) continue;
-        if (summary.archived && query.includeArchived !== true) continue;
-        if (!summaryMatchesChildOf(summary, query.childOf)) continue;
-        collected.push(summary);
-      }
-    }
-    const items = collected.toSorted(canonicalOrder);
+    const locations = await this.collectLegacy(query.workspaceIds);
+    const items = [...locations.values()]
+      .map((location) => location.summary)
+      .filter((summary) => query.includeArchived === true || !summary.archived)
+      .filter((summary) => summaryMatchesChildOf(summary, query.childOf))
+      .toSorted(canonicalOrder);
 
     let start = 0;
     let end = items.length;
@@ -666,31 +667,81 @@ export class FileSessionIndex extends Disposable implements ISessionIndex {
   }
 
   private async getLegacy(id: string): Promise<SessionSummary | undefined> {
-    for (const workspaceId of await listWorkspaceIds(this.storage, this.sessionsScope)) {
-      const sessionIds = await listSessionIds(this.storage, this.sessionsScope, workspaceId);
-      if (!sessionIds.includes(id)) continue;
-      const summary = await readSessionSummary(this.docs, this.sessionsScope, workspaceId, id);
-      if (summary !== undefined) return summary;
-    }
-    return undefined;
+    return (await this.locateLegacy(id))?.summary;
   }
 
   private async countLegacy(query: SessionCountQuery): Promise<number> {
-    let count = 0;
-    const workspaceIds =
-      query.workspaceIds ?? (await listWorkspaceIds(this.storage, this.sessionsScope));
-    for (const workspaceId of workspaceIds) {
-      for (const sessionId of await listSessionIds(this.storage, this.sessionsScope, workspaceId)) {
-        const summary = await readSessionSummary(this.docs, this.sessionsScope, workspaceId, sessionId);
-        if (summary === undefined) continue;
-        if (query.includeArchived === true || !summary.archived) count += 1;
+    const locations = await this.collectLegacy(query.workspaceIds);
+    return [...locations.values()].filter(
+      (location) => query.includeArchived === true || !location.summary.archived,
+    ).length;
+  }
+
+  private async locateLegacy(id: string): Promise<SessionLocation | undefined> {
+    const matches: SessionLocation[] = [];
+    for (const root of this.bootstrap.sessionStorageRoots) {
+      for (const workspaceId of await listWorkspaceIds(this.storage, root.sessionsScope)) {
+        const sessionIds = await listSessionIds(this.storage, root.sessionsScope, workspaceId);
+        if (!sessionIds.includes(id)) continue;
+        const summary = await readSessionSummary(this.docs, root.sessionsScope, workspaceId, id);
+        if (summary !== undefined) matches.push({ summary, sessionsScope: root.sessionsScope });
       }
     }
-    return count;
+    this.assertOneLocation(id, matches);
+    return matches[0];
+  }
+
+  private async collectLegacy(
+    workspaceIds: readonly string[] | undefined,
+  ): Promise<Map<string, SessionLocation>> {
+    const collected = new Map<string, SessionLocation>();
+    for (const root of this.bootstrap.sessionStorageRoots) {
+      const rootWorkspaceIds =
+        workspaceIds ?? (await listWorkspaceIds(this.storage, root.sessionsScope));
+      for (const workspaceId of rootWorkspaceIds) {
+        for (const sessionId of await listSessionIds(
+          this.storage,
+          root.sessionsScope,
+          workspaceId,
+        )) {
+          const summary = await readSessionSummary(
+            this.docs,
+            root.sessionsScope,
+            workspaceId,
+            sessionId,
+          );
+          if (summary === undefined) continue;
+          const next = { summary, sessionsScope: root.sessionsScope };
+          const existing = collected.get(sessionId);
+          if (existing !== undefined) this.assertOneLocation(sessionId, [existing, next]);
+          collected.set(sessionId, next);
+        }
+      }
+    }
+    return collected;
+  }
+
+  private assertOneLocation(id: string, locations: readonly SessionLocation[]): void {
+    if (locations.length <= 1) return;
+    const sessionDirs = locations.map((location) => {
+      const root = this.bootstrap.sessionStorageRoots.find(
+        (candidate) => candidate.sessionsScope === location.sessionsScope,
+      );
+      return root === undefined
+        ? location.sessionsScope
+        : `${root.sessionsDir}/${location.summary.workspaceId}/${id}`;
+    });
+    throw new Error2(
+      ErrorCodes.SESSION_STORAGE_CONFLICT,
+      `Session "${id}" exists in multiple session homes`,
+      { details: { sessionId: id, sessionDirs } },
+    );
   }
 
   private readModelEnabled(): boolean {
-    return this.flags.enabled(READ_MODEL_FLAG);
+    return (
+      this.bootstrap.sessionStorageRoots.length === 1 && this.flags.enabled(READ_MODEL_FLAG)
+    );
   }
 }
 

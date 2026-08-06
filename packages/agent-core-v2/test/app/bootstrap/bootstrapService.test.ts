@@ -47,6 +47,37 @@ describe('BootstrapService (scoped)', () => {
     host.dispose();
   });
 
+  it('exposes separate auth and primary-plus-fallback session homes', () => {
+    const host = createScopedTestHost(
+      bootstrapSeed({
+        homeDir: '/tmp/kiminn',
+        authHomeDir: '/tmp/kimi-code',
+        sessionHomeDir: '/tmp/kimi-code',
+        clientIdentity: stubClientIdentity,
+      }),
+    );
+    const svc = host.app.accessor.get(IBootstrapService);
+    expect(svc.authHomeDir).toBe('/tmp/kimi-code');
+    expect(svc.authCredentialsReadOnly).toBe(true);
+    expect(svc.scope('sessions')).toBe('../kimi-code/sessions');
+    expect(svc.sessionsDir).toBe('/tmp/kimi-code/sessions');
+    expect(svc.sessionStorageRoots).toEqual([
+      {
+        homeDir: '/tmp/kimi-code',
+        homeScope: '../kimi-code',
+        sessionsDir: '/tmp/kimi-code/sessions',
+        sessionsScope: '../kimi-code/sessions',
+      },
+      {
+        homeDir: '/tmp/kiminn',
+        homeScope: '',
+        sessionsDir: '/tmp/kiminn/sessions',
+        sessionsScope: 'sessions',
+      },
+    ]);
+    host.dispose();
+  });
+
   it('getEnv reads from the seeded env bag', () => {
     const host = createScopedTestHost(
       bootstrapSeed({ env: { FOO: 'bar' }, clientIdentity: stubClientIdentity }),

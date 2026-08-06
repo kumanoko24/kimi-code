@@ -69,8 +69,9 @@ export function dedupeByRoot(byId: ReadonlyMap<string, Workspace>): Workspace[] 
 
 export async function readSessionIndexEntries(
   storage: IFileSystemStorageService,
+  scope = SESSION_INDEX_SCOPE,
 ): Promise<SessionIndexLine[]> {
-  const bytes = await storage.read(SESSION_INDEX_SCOPE, SESSION_INDEX_KEY);
+  const bytes = await storage.read(scope, SESSION_INDEX_KEY);
   if (bytes === undefined) return [];
   const entries: SessionIndexLine[] = [];
   for (const line of textDecoder.decode(bytes).split(/\r?\n/)) {
@@ -85,9 +86,10 @@ export async function readSessionIndexEntries(
 
 export async function readSessionIndexWorkDirs(
   storage: IFileSystemStorageService,
+  scope = SESSION_INDEX_SCOPE,
 ): Promise<readonly string[]> {
   const workDirs: string[] = [];
-  for (const entry of await readSessionIndexEntries(storage)) {
+  for (const entry of await readSessionIndexEntries(storage, scope)) {
     if (!isAbsolute(entry.workDir)) continue;
     workDirs.push(entry.workDir);
   }

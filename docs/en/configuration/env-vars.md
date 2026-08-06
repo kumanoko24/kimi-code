@@ -24,6 +24,28 @@ export KIMI_CODE_HOME="/path/to/custom/kimi-code"
 
 For the complete data directory structure, see [Data locations](./data-locations.md).
 
+### `KIMI_CODE_SESSION_HOME`
+
+Overrides only the primary home for session history. New and forked sessions are written there, while the regular `KIMI_CODE_HOME` remains a fallback for listing and resuming sessions created before the override was added:
+
+```sh
+export KIMI_CODE_HOME="$HOME/.kimi-isolated"
+export KIMI_CODE_SESSION_HOME="$HOME/.kimi-code"
+```
+
+Updates stay with the home that already owns the session; resuming an older fallback session does not move it. If the same session id exists in both homes, the CLI reports a storage conflict instead of choosing one copy.
+
+### `KIMI_CODE_AUTH_HOME`
+
+Overrides only the home used for OAuth credentials. This lets an isolated profile reuse an existing Kimi Code login without sharing its `config.toml`, Skills, agents, or other profile data:
+
+```sh
+export KIMI_CODE_HOME="$HOME/.kimi-isolated"
+export KIMI_CODE_AUTH_HOME="$HOME/.kimi-code"
+```
+
+When the auth home differs from `KIMI_CODE_HOME`, the isolated profile can use and automatically refresh the borrowed credentials, but `/login` and `/logout` cannot replace or remove them. Manage that login from the profile that owns `KIMI_CODE_AUTH_HOME`.
+
 ### `KIMI_DISABLE_TELEMETRY`
 
 Set to `1` to turn off anonymous telemetry reporting (also accepts `true`, `yes`, `y`, case-insensitive):
@@ -121,6 +143,8 @@ Switches that control the behavior of subsystems such as telemetry, background t
 | Variable | Purpose | Valid values |
 | --- | --- | --- |
 | `KIMI_DISABLE_TELEMETRY` | Disable anonymous telemetry reporting | `1`, `true`, `yes`, `y` (case-insensitive) |
+| `KIMI_CODE_SESSION_HOME` | Primary home for new session history; `KIMI_CODE_HOME` remains a read/resume fallback when the paths differ | Directory path |
+| `KIMI_CODE_AUTH_HOME` | Home used for OAuth credentials; a distinct home is borrowed with login/logout protection | Directory path |
 | `KIMI_CODE_BACKGROUND_KEEP_ALIVE_ON_EXIT` | Whether to keep background tasks when the session closes; takes higher priority than `config.toml`. The default is to stop them on exit | Truthy: `1`/`true`/`yes`/`on`; falsy: `0`/`false`/`no`/`off` |
 | `KIMI_CODE_BACKGROUND_MAX_RUNNING_TASKS` | Cap on concurrently running background tasks; takes higher priority than `[background] max_running_tasks` in `config.toml` (unset means no cap) | Positive integer; invalid values are ignored |
 | `KIMI_IMAGE_MAX_EDGE_PX` | Longest-edge ceiling (px) for image compression; takes higher priority than `[image] max_edge_px` in `config.toml` (default `2000`) | Positive integer; invalid values are ignored |

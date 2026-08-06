@@ -10,7 +10,7 @@ export const openAIResponsesCompactionFlag: FlagDefinitionInput = {
   id: OPENAI_RESPONSES_COMPACTION_FLAG_ID,
   title: 'OpenAI Responses native compaction',
   description:
-    'Use a configured OpenAI Responses provider compact endpoint and preserve its opaque context state.',
+    'Use the OpenAI Responses compact endpoint and replay its opaque provider-native context unchanged.',
   env: OPENAI_RESPONSES_COMPACTION_FLAG_ENV,
   default: false,
   surface: 'core',

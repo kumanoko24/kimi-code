@@ -23,6 +23,20 @@ Once set, **all** Kimi Code data — config, sessions, logs, OAuth credentials, 
 **Generic `.agents` resources** stay under the real OS home so they can be shared across tools. For example, user-level generic Skills remain at `~/.agents/skills/`, while Kimi-specific user Skills move with `KIMI_CODE_HOME` as `$KIMI_CODE_HOME/skills/`.
 :::
 
+## Split session and credential homes
+
+An isolated profile can keep its config, `agents/`, Skills, plugins, and logs under `KIMI_CODE_HOME` while sharing only session history or OAuth credentials with another profile:
+
+```sh
+export KIMI_CODE_HOME="$HOME/.kimi-isolated"
+export KIMI_CODE_SESSION_HOME="$HOME/.kimi-code"
+export KIMI_CODE_AUTH_HOME="$HOME/.kimi-code"
+```
+
+`KIMI_CODE_SESSION_HOME` becomes the primary owner for new and forked sessions. The runtime home remains a fallback for existing sessions, and later writes stay in whichever home already owns each session. `KIMI_CODE_AUTH_HOME` supplies the OAuth credential files; when it differs from the runtime home, the isolated profile cannot replace or delete those credentials through `/login` or `/logout`.
+
+These overrides do not move `config.toml`, `AGENTS.md`, `agents/`, `skills/`, plugins, logs, or UI preferences. Those continue to follow `KIMI_CODE_HOME`. See [Environment variables](./env-vars.md#kimi_code_session_home) for the full behavior and conflict rules.
+
 ## Directory layout
 
 ```

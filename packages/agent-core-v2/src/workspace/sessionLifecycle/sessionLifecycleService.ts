@@ -140,7 +140,12 @@ import {
 import { IWorkspaceSkillCatalog } from '#/workspace/workspaceSkillCatalog/workspaceSkillCatalog';
 import { IWorkspaceToolPolicy } from '#/workspace/workspaceToolPolicy/workspaceToolPolicy';
 
-import { agentScopeOf, sessionDirOf, sessionScopeOf } from './internal/addressing';
+import {
+  agentScopeOf,
+  sessionDirOf,
+  sessionScopeOf,
+  workspacePersistenceScope,
+} from './internal/addressing';
 import {
   type CreateChildSessionOptions,
   type CreateSessionOptions,
@@ -156,6 +161,8 @@ import {
 
 type MaterializeSessionOptions = Omit<CreateSessionOptions, 'sessionId'> & {
   readonly sessionId: string;
+  /** Session-root scope selected by the authoritative session index. */
+  readonly sessionsScope?: string;
 };
 
 export class SessionLifecycleService extends Disposable implements ISessionLifecycleService {
@@ -232,6 +239,9 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
 
   async create(opts: CreateSessionOptions): Promise<ISessionScopeHandle> {
     const sessionId = opts.sessionId ?? createSessionId();
+    if (opts.sessionId !== undefined && (await this.index.locate(sessionId)) !== undefined) {
+      throw new Error2(ErrorCodes.SESSION_ALREADY_EXISTS, `Session "${sessionId}" already exists`);
+    }
     const handle = await this.materializeSession({ ...opts, sessionId });
     try {
       const main =
@@ -260,8 +270,12 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
 
   private async materializeSession(opts: MaterializeSessionOptions): Promise<ISessionScopeHandle> {
     const workspaceId = this.workspaceId;
-    const sessionScope = sessionScopeOf(this.handlerScope, opts.sessionId);
-    const sessionDir = sessionDirOf(this.bootstrap.homeDir, this.handlerScope, opts.sessionId);
+    const handlerScope = workspacePersistenceScope(
+      opts.sessionsScope ?? this.bootstrap.scope('sessions'),
+      workspaceId,
+    );
+    const sessionScope = sessionScopeOf(handlerScope, opts.sessionId);
+    const sessionDir = sessionDirOf(this.bootstrap.homeDir, handlerScope, opts.sessionId);
     const metaScope = sessionScope;
     await this.workspaceDirs.ready;
     await this.workspaceDirs.mergeAdditionalDirs(opts.workDir, opts.additionalDirs ?? []);
@@ -345,8 +359,9 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
   }
 
   private async appendSessionIndexEntry(sessionId: string, workDir: string): Promise<void> {
+    const root = this.bootstrap.sessionStorageRoots[0]!;
     const sessionDir = sessionDirOf(this.bootstrap.homeDir, this.handlerScope, sessionId);
-    this.appendLogStore.append('', 'session_index.jsonl', {
+    this.appendLogStore.append(root.homeScope, 'session_index.jsonl', {
       sessionId,
       sessionDir,
       workDir,
@@ -395,13 +410,15 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     const live = this.sessions.get(sessionId);
     if (live !== undefined) return live;
 
-    const summary = await this.index.get(sessionId);
-    if (summary === undefined || summary.workspaceId !== this.workspaceId) return undefined;
+    const location = await this.index.locate(sessionId);
+    if (location === undefined || location.summary.workspaceId !== this.workspaceId) return undefined;
+    const summary = location.summary;
     const workDir = summary.cwd ?? this.workspaceContext.cwd;
 
     const handle = await this.materializeSession({
       sessionId,
       workDir,
+      sessionsScope: location.sessionsScope,
       additionalDirs: opts?.additionalDirs,
       mcpServers: opts?.mcpServers,
     });
@@ -463,7 +480,8 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       await inflight.catch(() => undefined);
     }
     const handle = this.sessions.get(sessionId);
-    const summary = await this.index.get(sessionId);
+    const location = await this.index.locate(sessionId);
+    const summary = location?.summary;
     const persistedHere = summary !== undefined && summary.workspaceId === this.workspaceId;
     if (handle === undefined && !persistedHere) {
       throw new Error2(ErrorCodes.SESSION_NOT_FOUND, `session ${sessionId} does not exist`);
@@ -471,9 +489,17 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     if (handle !== undefined) {
       await this.close(sessionId);
     }
-    await this.hostFs.remove(sessionDirOf(this.bootstrap.homeDir, this.handlerScope, sessionId));
+    const sessionsScope = location?.sessionsScope ?? this.bootstrap.scope('sessions');
+    const handlerScope = workspacePersistenceScope(sessionsScope, this.workspaceId);
+    await this.hostFs.remove(sessionDirOf(this.bootstrap.homeDir, handlerScope, sessionId));
     await this.index.remove(sessionId);
-    this.appendLogStore.append('', 'session_index.jsonl', { sessionId, deleted: true });
+    const root = this.bootstrap.sessionStorageRoots.find(
+      (candidate) => candidate.sessionsScope === sessionsScope,
+    );
+    this.appendLogStore.append(root?.homeScope ?? '', 'session_index.jsonl', {
+      sessionId,
+      deleted: true,
+    });
     await this.appendLogStore.flush();
   }
 
@@ -494,7 +520,8 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     const sourceId = opts.sourceSessionId;
 
     const sourceHandle = this.sessions.get(sourceId);
-    const indexSummary = await this.index.get(sourceId);
+    const sourceLocation = await this.index.locate(sourceId);
+    const indexSummary = sourceLocation?.summary;
     if (
       (sourceHandle === undefined && indexSummary === undefined) ||
       (indexSummary !== undefined && indexSummary.workspaceId !== this.workspaceId)
@@ -509,10 +536,13 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       const sourceMeta =
         sourceHandle !== undefined
           ? await sourceHandle.accessor.get(ISessionMetadata).read()
-          : await this.readMetaFromDisk(sourceId);
+          : await this.readMetaFromDisk(sourceId, sourceLocation?.sessionsScope);
 
       targetId = opts.newSessionId ?? createSessionId();
-      if (this.sessions.has(targetId) || (await this.index.get(targetId)) !== undefined) {
+      if (
+        this.sessions.has(targetId) ||
+        (opts.newSessionId !== undefined && (await this.index.locate(targetId)) !== undefined)
+      ) {
         throw new Error2(
           ErrorCodes.SESSION_ALREADY_EXISTS,
           `Session "${targetId}" already exists`,
@@ -520,8 +550,19 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       }
 
       targetSessionDir = sessionDirOf(this.bootstrap.homeDir, this.handlerScope, targetId);
+      const sourceSessionScope =
+        sourceHandle?.accessor.get(ISessionContext).scope() ??
+        sessionScopeOf(
+          workspacePersistenceScope(sourceLocation!.sessionsScope, this.workspaceId),
+          sourceId,
+        );
       await this.copySessionFiles(
-        sessionDirOf(this.bootstrap.homeDir, this.handlerScope, sourceId),
+        sourceHandle?.accessor.get(ISessionContext).sessionDir ??
+          sessionDirOf(
+            this.bootstrap.homeDir,
+            workspacePersistenceScope(sourceLocation!.sessionsScope, this.workspaceId),
+            sourceId,
+          ),
         targetSessionDir,
       );
 
@@ -537,9 +578,9 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
       for (const agentId of agentIds) {
         await this.copyAgentWire({
           sourceHandle,
-          sourceSessionId: sourceId,
+          sourceSessionScope,
           agentId,
-          targetSessionId: targetCtx.sessionId,
+          targetSessionScope: targetCtx.scope(),
         });
       }
 
@@ -616,9 +657,9 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
 
   private async copyAgentWire(args: {
     readonly sourceHandle: ISessionScopeHandle | undefined;
-    readonly sourceSessionId: string;
+    readonly sourceSessionScope: string;
     readonly agentId: string;
-    readonly targetSessionId: string;
+    readonly targetSessionScope: string;
   }): Promise<void> {
     if (args.sourceHandle !== undefined) {
       const agentHandle = args.sourceHandle.accessor
@@ -631,7 +672,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
 
     const records = await collect(
       this.appendLogStore.read<WireRecord>(
-        agentScopeOf(sessionScopeOf(this.handlerScope, args.sourceSessionId), args.agentId),
+        agentScopeOf(args.sourceSessionScope, args.agentId),
         AGENT_WIRE_RECORD_KEY,
       ),
     );
@@ -643,7 +684,7 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     records.push(forkedRecord());
 
     await this.appendLogStore.rewrite(
-      agentScopeOf(sessionScopeOf(this.handlerScope, args.targetSessionId), args.agentId),
+      agentScopeOf(args.targetSessionScope, args.agentId),
       AGENT_WIRE_RECORD_KEY,
       records,
     );
@@ -705,8 +746,13 @@ export class SessionLifecycleService extends Disposable implements ISessionLifec
     }
   }
 
-  private async readMetaFromDisk(sessionId: string): Promise<SessionMeta | undefined> {
-    return this.docs.get<SessionMeta>(sessionScopeOf(this.handlerScope, sessionId), 'state.json');
+  private async readMetaFromDisk(
+    sessionId: string,
+    sessionsScope: string | undefined,
+  ): Promise<SessionMeta | undefined> {
+    if (sessionsScope === undefined) return undefined;
+    const handlerScope = workspacePersistenceScope(sessionsScope, this.workspaceId);
+    return this.docs.get<SessionMeta>(sessionScopeOf(handlerScope, sessionId), 'state.json');
   }
 }
 

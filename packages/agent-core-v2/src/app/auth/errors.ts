@@ -11,6 +11,7 @@ export const AuthErrors = {
     AUTH_TOKEN_MISSING: 'auth.token_missing',
     AUTH_TOKEN_UNAUTHORIZED: 'auth.token_unauthorized',
     AUTH_MODEL_NOT_RESOLVED: 'auth.model_not_resolved',
+    AUTH_CREDENTIALS_READ_ONLY: 'auth.credentials_read_only',
   },
   info: {
     'auth.login_required': {
@@ -42,6 +43,12 @@ export const AuthErrors = {
       retryable: false,
       public: true,
       action: 'Set a default model or configure the requested model alias.',
+    },
+    'auth.credentials_read_only': {
+      title: 'Credentials are read-only',
+      retryable: false,
+      public: true,
+      action: 'Run login or logout from the Kimi Code home that owns these credentials.',
     },
   },
 } as const satisfies ErrorDomain;

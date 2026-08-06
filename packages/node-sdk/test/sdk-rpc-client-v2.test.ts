@@ -12,6 +12,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  FileTokenStorage,
+  KIMI_CODE_PROVIDER_NAME,
+  type TokenInfo,
+} from '@moonshot-ai/kimi-code-oauth';
+import { IHostRequestHeaders, IOAuthService } from '@moonshot-ai/agent-core-v2';
 
 import {
   createKimiHarnessV2,
@@ -23,7 +29,6 @@ import {
   type KimiConfig,
 } from '#/index';
 import { foldAgentWireReplay } from '#/v2/resume-replay';
-import { IHostRequestHeaders } from '@moonshot-ai/agent-core-v2';
 
 import { TEST_IDENTITY } from './test-identity';
 import { recordingTelemetry, type TelemetryRecord } from './telemetry';
@@ -43,22 +48,81 @@ async function makeHarness(): Promise<{ harness: KimiHarness; homeDir: string }>
 }
 
 describe('SDKRpcClientV2 (agent-core-v2 wiring MVP)', () => {
-  it('fails closed when a separate auth home is requested', async () => {
+  it('reads OAuth credentials from a separate auth home in both SDK and engine paths', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-'));
     const authHomeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-auth-'));
     tempDirs.push(homeDir, authHomeDir);
 
-    expect(() => createKimiHarnessV2({ homeDir, authHomeDir, identity: TEST_IDENTITY }))
-      .toThrowError(KimiError);
+    const token: TokenInfo = {
+      accessToken: 'shared-access-token',
+      refreshToken: 'shared-refresh-token',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      scope: '',
+      tokenType: 'Bearer',
+      expiresIn: 3600,
+    };
+    await new FileTokenStorage(join(authHomeDir, 'credentials')).save('kimi-code', token);
+    const client = new SDKRpcClientV2({ homeDir, authHomeDir, identity: TEST_IDENTITY });
+    try {
+      await expect(client.auth.getCachedAccessToken()).resolves.toBe('shared-access-token');
+      await expect(
+        client.engineAccessor
+          .get(IOAuthService)
+          .getCachedAccessToken(KIMI_CODE_PROVIDER_NAME),
+      ).resolves.toBe('shared-access-token');
+      await expect(client.auth.logout()).rejects.toMatchObject({
+        code: ErrorCodes.AUTH_CREDENTIALS_READ_ONLY,
+      });
+    } finally {
+      await client.close();
+    }
   });
 
-  it('fails closed when a separate session home is requested', async () => {
+  it('creates sessions in the separate primary session home', async () => {
     const homeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-'));
     const sessionHomeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-session-'));
     tempDirs.push(homeDir, sessionHomeDir);
 
-    expect(() => createKimiHarnessV2({ homeDir, sessionHomeDir, identity: TEST_IDENTITY }))
-      .toThrowError(KimiError);
+    const workDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-work-'));
+    tempDirs.push(workDir);
+    const harness = createKimiHarnessV2({
+      homeDir,
+      sessionHomeDir,
+      identity: TEST_IDENTITY,
+    });
+    try {
+      const session = await harness.createSession({ workDir });
+      const [summary] = await harness.listSessions({ sessionId: session.id });
+      expect(summary?.sessionDir.startsWith(join(sessionHomeDir, 'sessions'))).toBe(true);
+      await session.close();
+    } finally {
+      await harness.close();
+    }
+  });
+
+  it('resumes a fallback session and keeps mutations in its owning home', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-'));
+    const sessionHomeDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-session-'));
+    const workDir = await mkdtemp(join(tmpdir(), 'kimi-sdk-v2-work-'));
+    tempDirs.push(homeDir, sessionHomeDir, workDir);
+    const original = createKimiHarnessV2({ homeDir, identity: TEST_IDENTITY });
+    const created = await original.createSession({ workDir });
+    const sessionId = created.id;
+    await created.close();
+    await original.close();
+
+    const split = createKimiHarnessV2({ homeDir, sessionHomeDir, identity: TEST_IDENTITY });
+    try {
+      const resumed = await split.resumeSession({ id: sessionId });
+      await split.renameSession({ id: sessionId, title: 'fallback-owner' });
+      const [summary] = await split.listSessions({ sessionId });
+      expect(resumed.id).toBe(sessionId);
+      expect(summary).toMatchObject({ title: 'fallback-owner' });
+      expect(summary?.sessionDir.startsWith(join(homeDir, 'sessions'))).toBe(true);
+      await resumed.close();
+    } finally {
+      await split.close();
+    }
   });
 
   it('seeds the host request headers (User-Agent + X-Msh-*) into the engine', async () => {

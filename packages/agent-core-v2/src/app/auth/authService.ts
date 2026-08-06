@@ -107,6 +107,7 @@ export class OAuthService extends Disposable implements IOAuthService {
   private refreshChain: Promise<unknown> = Promise.resolve();
 
   constructor(
+    @IBootstrapService private readonly bootstrap: IBootstrapService,
     @IOAuthToolkit private readonly toolkit: IOAuthToolkit,
     @IProviderService private readonly providerService: IProviderService,
     @IConfigService private readonly config: IConfigService,
@@ -121,6 +122,7 @@ export class OAuthService extends Disposable implements IOAuthService {
   }
 
   async startLogin(provider = KIMI_CODE_PROVIDER_NAME): Promise<OAuthFlowStart> {
+    this.assertCredentialsWritable();
     this.log.info('oauth startLogin: enter', { provider });
     const loginAuth = this.resolveLoginAuth(provider);
     this.log.info('oauth startLogin: resolved login auth', {
@@ -232,6 +234,7 @@ export class OAuthService extends Disposable implements IOAuthService {
   }
 
   async logout(provider = KIMI_CODE_PROVIDER_NAME): Promise<OAuthLogoutResponse> {
+    this.assertCredentialsWritable();
     const oauthRef =
       provider === KIMI_CODE_PROVIDER_NAME
         ? this.resolveRuntimeOAuthRef(provider)
@@ -240,6 +243,14 @@ export class OAuthService extends Disposable implements IOAuthService {
     this.abortExisting(provider);
     await this.deprovisionProvider(provider);
     return { logged_out: true, provider: result.providerName };
+  }
+
+  private assertCredentialsWritable(): void {
+    if (!this.bootstrap.authCredentialsReadOnly) return;
+    throw new Error2(
+      ErrorCodes.AUTH_CREDENTIALS_READ_ONLY,
+      'This client reads credentials from another Kimi Code home and cannot modify them.',
+    );
   }
 
   async status(provider = KIMI_CODE_PROVIDER_NAME): Promise<AuthStatus> {
@@ -860,7 +871,7 @@ function managedModel(
 class OAuthToolkitService extends KimiOAuthToolkit implements IOAuthToolkit {
   declare readonly _serviceBrand: undefined;
   constructor(@IBootstrapService bootstrap: IBootstrapService) {
-    super({ homeDir: bootstrap.homeDir, identity: bootstrap.clientIdentity });
+    super({ homeDir: bootstrap.authHomeDir, identity: bootstrap.clientIdentity });
   }
 }
 

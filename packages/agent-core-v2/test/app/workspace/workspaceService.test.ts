@@ -19,10 +19,12 @@ import { JsonAtomicDocumentStore } from '#/persistence/backends/node-fs/atomicDo
 import { FileStorageService } from '#/persistence/backends/node-fs/fileStorageService';
 import { IAtomicDocumentStore } from '#/persistence/interface/atomicDocumentStore';
 import { IFileSystemStorageService } from '#/persistence/interface/storage';
+import { IBootstrapService } from '#/app/bootstrap/bootstrap';
 import { IWorkspaceService } from '#/app/workspace/workspace';
 import { WorkspaceService } from '#/app/workspace/workspaceService';
 import { FileWorkspacePersistence } from '#/app/workspace/fileWorkspacePersistence';
 import { IWorkspacePersistence, type PersistedWorkspaceEntry } from '#/app/workspace/workspacePersistence';
+import { stubBootstrap } from '../bootstrap/stubs';
 
 interface SessionIndexLine {
   readonly sessionId: string;
@@ -65,6 +67,7 @@ describe('WorkspaceService (file-backed)', () => {
       stubPair(IFileSystemStorageService, fileStorage),
       stubPair(IAtomicDocumentStore, new JsonAtomicDocumentStore(fileStorage)),
       stubPair(IHostFileSystem, hostFs),
+      stubPair(IBootstrapService, stubBootstrap(homeDir)),
     ]);
     currentHost = host;
     return host.app.accessor.get(IWorkspaceService);

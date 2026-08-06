@@ -87,6 +87,7 @@ import { IWorkspaceMcpService } from '#/workspace/workspaceMcp/workspaceMcp';
 import { IWorkspaceSkillCatalog } from '#/workspace/workspaceSkillCatalog/workspaceSkillCatalog';
 
 import { stubLog } from '../../_base/log/stubs';
+import { stubBootstrap } from '../../app/bootstrap/stubs';
 
 function workspaceCatalogStub(): IWorkspaceService {
   const workspaces = new Map<string, Workspace>();
@@ -274,12 +275,7 @@ describe('workspace add-dir (handler chain)', () => {
   }
 
   function buildHost(homeDir: string): ScopedTestHost {
-    const bootstrap = {
-      _serviceBrand: undefined,
-      homeDir,
-      osHomeDir: homeDir,
-      scope: (name: string) => name,
-    } as unknown as IBootstrapService;
+    const bootstrap = { ...stubBootstrap(homeDir), osHomeDir: homeDir };
     const hostFs = new HostFileSystem();
     const host = createScopedTestHost([
       stubPair(IBootstrapService, bootstrap),
@@ -304,6 +300,7 @@ describe('workspace add-dir (handler chain)', () => {
         _serviceBrand: undefined,
         list: () => Promise.resolve({ items: [], total: 0, hasMore: false }),
         get: () => Promise.resolve(undefined),
+        locate: () => Promise.resolve(undefined),
         countActive: () => Promise.resolve(0),
       } as unknown as ISessionIndex),
       stubPair(IAppendLogStore, {

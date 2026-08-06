@@ -23,6 +23,20 @@ export KIMI_CODE_HOME="$HOME/.config/kimi-code"
 **通用 `.agents` 资源**仍放在真实 OS home 下，以便跨工具共享。例如，用户级通用 Skills 仍位于 `~/.agents/skills/`，而 Kimi 专属用户级 Skills 会随 `KIMI_CODE_HOME` 移动到 `$KIMI_CODE_HOME/skills/`。
 :::
 
+## 拆分会话与凭据目录
+
+独立 profile 可以把配置、`agents/`、Skills、plugins 和日志留在 `KIMI_CODE_HOME`，只与另一个 profile 共享会话历史或 OAuth 凭据：
+
+```sh
+export KIMI_CODE_HOME="$HOME/.kimi-isolated"
+export KIMI_CODE_SESSION_HOME="$HOME/.kimi-code"
+export KIMI_CODE_AUTH_HOME="$HOME/.kimi-code"
+```
+
+`KIMI_CODE_SESSION_HOME` 会成为新建和分支会话的主要存放位置。运行时数据目录仍作为既有会话的回退来源，后续写入会留在原本存放各会话的目录。`KIMI_CODE_AUTH_HOME` 提供 OAuth 凭据文件；当它与运行时数据目录不同时，独立 profile 不能通过 `/login` 或 `/logout` 替换或删除这些凭据。
+
+这些覆盖不会移动 `config.toml`、`AGENTS.md`、`agents/`、`skills/`、plugins、日志或终端界面偏好；它们仍跟随 `KIMI_CODE_HOME`。完整行为和冲突规则见 [环境变量](./env-vars.md#kimi_code_session_home)。
+
 ## 目录结构
 
 ```

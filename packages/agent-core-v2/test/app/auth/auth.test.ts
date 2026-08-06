@@ -208,6 +208,30 @@ describe('OAuthService', () => {
     return ix.get(IOAuthService);
   }
 
+  it('rejects login when credentials are borrowed from another home', async () => {
+    const bootstrap = ix.get(IBootstrapService) as IBootstrapService & {
+      authCredentialsReadOnly: boolean;
+    };
+    bootstrap.authCredentialsReadOnly = true;
+
+    await expect(createService().startLogin(OAUTH_PROVIDER)).rejects.toMatchObject({
+      code: 'auth.credentials_read_only',
+    });
+    expect(toolkit.login).not.toHaveBeenCalled();
+  });
+
+  it('rejects logout when credentials are borrowed from another home', async () => {
+    const bootstrap = ix.get(IBootstrapService) as IBootstrapService & {
+      authCredentialsReadOnly: boolean;
+    };
+    bootstrap.authCredentialsReadOnly = true;
+
+    await expect(createService().logout(OAUTH_PROVIDER)).rejects.toMatchObject({
+      code: 'auth.credentials_read_only',
+    });
+    expect(toolkit.logout).not.toHaveBeenCalled();
+  });
+
   function configBacking(): Record<string, unknown> {
     return { providers, models, services, defaultModel, thinking };
   }

@@ -56,6 +56,7 @@ import { basename, isAbsolute } from 'pathe';
 
 import { LifecycleScope, ScopeActivation, registerScopedService } from '#/_base/di/scope';
 import { encodeWorkDirKey, workspaceRootKey } from '#/_base/utils/workdir-slug';
+import { IBootstrapService } from '#/app/bootstrap/bootstrap';
 import { ErrorCodes, Error2, unwrapErrorCause } from '#/errors';
 import { IHostFileSystem } from '#/os/interface/hostFileSystem';
 import { IFileSystemStorageService } from '#/persistence/interface/storage';
@@ -76,6 +77,7 @@ export class WorkspaceService implements IWorkspaceService {
   private opQueue: Promise<unknown> = Promise.resolve();
 
   constructor(
+    @IBootstrapService private readonly bootstrap: IBootstrapService,
     @IWorkspacePersistence private readonly store: IWorkspacePersistence,
     @IFileSystemStorageService private readonly storage: IFileSystemStorageService,
     @IHostFileSystem private readonly hostFs: IHostFileSystem,
@@ -176,7 +178,7 @@ export class WorkspaceService implements IWorkspaceService {
       const catalog = await this.loadCatalog();
       let root = catalog.workspaces.find((ws) => ws.id === id)?.root;
       if (root === undefined) {
-        root = (await readSessionIndexEntries(this.storage)).find(
+        root = (await this.readAllSessionIndexEntries()).find(
           (line) => encodeWorkDirKey(line.workDir) === id,
         )?.workDir;
       }
@@ -190,7 +192,7 @@ export class WorkspaceService implements IWorkspaceService {
       const rootKey = workspaceRootKey(root);
       const aliasIds = collectAliasIds(
         catalog.workspaces,
-        await readSessionIndexEntries(this.storage),
+        await this.readAllSessionIndexEntries(),
         root,
       );
       await this.store.save({
@@ -227,7 +229,7 @@ export class WorkspaceService implements IWorkspaceService {
   ): Promise<boolean> {
     let changed = false;
     const now = Date.now();
-    for (const workDir of await readSessionIndexWorkDirs(this.storage)) {
+    for (const workDir of await this.readAllSessionIndexWorkDirs()) {
       const id = encodeWorkDirKey(workDir);
       if (byId.has(id) || deletedIds.has(id)) continue;
       byId.set(id, {
@@ -246,7 +248,7 @@ export class WorkspaceService implements IWorkspaceService {
     const result = new Map<string, Workspace>();
     const now = Date.now();
     const seenRootKeys = new Set<string>();
-    for (const entry of await readSessionIndexEntries(this.storage)) {
+    for (const entry of await this.readAllSessionIndexEntries()) {
       if (!isAbsolute(entry.workDir)) continue;
       const rootKey = workspaceRootKey(entry.workDir);
       if (seenRootKeys.has(rootKey)) continue;
@@ -270,6 +272,26 @@ export class WorkspaceService implements IWorkspaceService {
       () => {},
     );
     return next;
+  }
+
+  private async readAllSessionIndexEntries() {
+    return (
+      await Promise.all(
+        this.bootstrap.sessionStorageRoots.map((root) =>
+          readSessionIndexEntries(this.storage, root.homeScope),
+        ),
+      )
+    ).flat();
+  }
+
+  private async readAllSessionIndexWorkDirs(): Promise<readonly string[]> {
+    return (
+      await Promise.all(
+        this.bootstrap.sessionStorageRoots.map((root) =>
+          readSessionIndexWorkDirs(this.storage, root.homeScope),
+        ),
+      )
+    ).flat();
   }
 }
 
