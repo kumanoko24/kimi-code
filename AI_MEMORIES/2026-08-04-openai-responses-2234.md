@@ -282,6 +282,35 @@ Evidence:
 - live `127.0.0.1:2234` health and dashboard snapshot passed: gateway READY, four fresh eligible accounts, zero in-flight requests, and the latest Sol/xhigh Responses session completed 4/4 requests with HTTP 200 and a 48.1% cache-hit ratio; the local UI remains `http://127.0.0.1:2234/dashboard`;
 - unauthenticated `/pool/usage` still returns the designed `admin_auth_unavailable` response; this is not a dashboard failure because the separate loopback-only `/dashboard/api/snapshot` is the intended no-admin read surface.
 
+### M9 — agent-core-v2 split homes and isolated kiminn activation (PASS)
+
+Verified at `2026-08-06 09:06 UTC+8`.
+
+Success criteria:
+
+- remove the isolated wrapper's legacy-engine pin only after agent-core-v2 supports a canonical primary session home, an isolated fallback session home, and borrowed canonical OAuth;
+- preserve canonical `~/.kimi-code` binary, config, default mode, and builtin behavior;
+- prove new/create, primary resume, fallback resume, interactive selection, borrowed OAuth, GPT Agent/AgentSwarm routing, Responses image input, native compaction, and 2234 observability against live runtimes;
+- fix every defect exposed by RBV, pass regression/build gates, and push only the fork branch.
+
+Recovery boundary: restore `kimi`, `config.toml`, and `kiminn-wrapper` from `/Users/noelbao/.kiminn/backups/v2-split-homes-20260806-084949/`. The canonical Kimi install and the 2234 gateway require no rollback.
+
+Evidence:
+
+- commits `a063daabc`, `ba9d45bec`, and `3e23526d6` add v2 multi-home ownership, borrowed-auth protection, split-home propagation across native print/provider/export surfaces, and zero-timeout AgentSwarm semantics;
+- agent-core-v2 scans both homes authoritatively, writes new sessions to the configured primary, keeps resumed/deleted/fork source data bound to its owning root, rejects duplicate IDs as `session.storage_conflict`, and logs multi-home mode with `sessionHomeCount=2`;
+- the first live print-mode RBV exposed that native v2 `kimi -p` bypassed the SDK harness and omitted split-home inputs; failed evidence session `session_cefe627d-7cb1-4df4-886a-e1c6cfee8ebb` remains under `~/.kiminn` for inspection, while the corrected session `session_a787daf3-b528-4377-b574-b8f2439f85e9` exists only under `~/.kimi-code` and resumed successfully;
+- fallback session `session_3511bd01-5c24-4c9d-abac-0d4412ca6185` resumed and mutated in `~/.kiminn` without creating a canonical duplicate; the interactive `kiminn -S` PTY displayed the shared canonical session selector and exited cleanly;
+- K3 selected the exact `kimi-code/k3` model and reached the managed Coding Plan API through borrowed canonical OAuth; the resulting HTTP 403 is the account's billing-cycle quota limit, not a login/config fallback; explicit `kiminn login` then failed closed with `auth.credentials_read_only`, and the credential hash stayed `6fe842b3bd325c1e2e5175eeae645f1b016faff8c5d868a4af78bfd0d7b0e85a` before/after that attempt;
+- Agent session `session_0af706a4-fac5-4275-8158-a35b63876ca3` records main Sol/xhigh and `gpt-coder-tasker` Luna/max with `provider=openai_responses` and `maxTokens=258000`; reviewer swarm session `session_b8455fba-0886-423f-b143-6e87e374bfc7` completed 2/2 on Sol/xhigh, and planner swarm session `session_b705c02d-5cb9-4fc4-8df1-0ca7a50f039f` completed 2/2 on Sol/max;
+- RBV exposed that print mode's configured `timeout_ms=0` meant unbounded for Agent but immediate `setTimeout(0)` for AgentSwarm; the corrected batch scheduler treats non-positive timeouts as unbounded, with a dedicated 24-hour fake-clock contract test;
+- valid PNG requests to `/v1/responses` completed with HTTP 200 and exact markers for `gpt-5.6-sol`, `gpt-5.6-terra`, and `gpt-5.6-luna`; the initial invalid 1x1 fixture truthfully returned HTTP 400 for all three and was replaced rather than misclassified as a modality failure;
+- direct `/v1/responses/compact` returned HTTP 200 and `object=response.compaction` with `message` plus `compaction_summary`, using input context without an extra compaction prompt; installed v2 TUI `/compact` on the controlled canonical session reduced `324 → 138` displayed tokens, while logs record native `openai_responses` compaction in 3825 ms with 12013 input and 138 output tokens and wire begin/apply/complete facts;
+- the final installed isolated binary is version `0.33.0`, SHA-256 `05df1aa8525632578a3e63c9646237599dd99c64f8d49050cd82fa9ea10c8cff`; wrapper SHA-256 is `6729dac05340fc0da2cb7c153db9f71a55234d49123eac71d106ed6495555693`, contains no `KIMI_CODE_LEGACY_FLAG`, and retains interactive auto mode; isolated config remains `706a623ba8b37a7b218acea5a3eb2866faff15f1f3dfc4cfa3003c3da80cb386`;
+- canonical binary remains `befb752584de4be1e7fb5a6ec28dbc153fef19da8787a2ceb134039b5579063f` and canonical config remains `e8e084faca80e5395efed2703e075e2e55553eadf080c8539006dff51a6ac13e`; no canonical default mode or implementation was changed;
+- final gateway snapshot was READY with four fresh eligible accounts, 17 active retained sessions, zero in-flight requests, and selected-window totals of 64 requests, 61 successes, three failures, 1,148,073 input tokens, 505,856 cached tokens, 10,108 output tokens, and a 44.1% cache-hit ratio; `http://127.0.0.1:2234/dashboard` returned HTTP 200 and exposes hashed sessions, model/effort, usage, cache, outcome, latency, and account quota;
+- final full suites passed 4,748 agent-core-v2 tests, 350 node-SDK tests plus one todo, and 2,573 CLI tests plus two skips; post-RBV focused fixes passed 55 swarm tests and 66 split-home CLI tests, while relevant typechecks, docs build, native SEA builds, native smoke, and diff checks also passed.
+
 Local recovery:
 
 - pre-change Kimi config: `/Users/noelbao/.kimi-code/backups/openai-responses-20260804-0550/config.toml`;
