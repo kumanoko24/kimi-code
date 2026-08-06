@@ -607,6 +607,32 @@ describe('AgentRunBatch scheduling contract', () => {
     }
   });
 
+  it('treats a zero task timeout as unbounded', async () => {
+    vi.useFakeTimers();
+    try {
+      const { runBatch, attempts } = createMockAgentRunBatchRunner();
+      const running = runBatch([{ ...queuedAgentRunTask(1), timeout: 0 }], {
+        signal: new AbortController().signal,
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      attempts[0]!.markReady();
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+
+      attempts[0]!.outcome.resolve({
+        task: attempts[0]!.task,
+        agentId: 'agent-1',
+        status: 'completed',
+        result: 'completed 1',
+      });
+      await expect(running).resolves.toMatchObject([
+        { task: { data: 1 }, status: 'completed', result: 'completed 1' },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not spend task timeout while the task is queued', async () => {
     vi.useFakeTimers();
     try {
