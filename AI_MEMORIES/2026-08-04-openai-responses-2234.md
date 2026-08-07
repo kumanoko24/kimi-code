@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-06T07:11:43+08:00`
+- updated_at: `2026-08-07T22:17:14+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
-- current milestone: M8 — upstream sync and isolated kiminn redeploy
-- status: PASS (`M1` through `M8` independently PASS)
+- current milestone: M10 — upstream sync through `0b2e803d5`
+- status: PASS (`M1` through `M10` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -310,6 +310,29 @@ Evidence:
 - canonical binary remains `befb752584de4be1e7fb5a6ec28dbc153fef19da8787a2ceb134039b5579063f` and canonical config remains `e8e084faca80e5395efed2703e075e2e55553eadf080c8539006dff51a6ac13e`; no canonical default mode or implementation was changed;
 - final gateway snapshot was READY with four fresh eligible accounts, 17 active retained sessions, zero in-flight requests, and selected-window totals of 64 requests, 61 successes, three failures, 1,148,073 input tokens, 505,856 cached tokens, 10,108 output tokens, and a 44.1% cache-hit ratio; `http://127.0.0.1:2234/dashboard` returned HTTP 200 and exposes hashed sessions, model/effort, usage, cache, outcome, latency, and account quota;
 - final full suites passed 4,748 agent-core-v2 tests, 350 node-SDK tests plus one todo, and 2,573 CLI tests plus two skips; post-RBV focused fixes passed 55 swarm tests and 66 split-home CLI tests, while relevant typechecks, docs build, native SEA builds, native smoke, and diff checks also passed.
+
+### M10 — upstream sync through `0b2e803d5` (PASS)
+
+Verified at `2026-08-07 22:17 UTC+8`.
+
+Success criteria:
+
+- merge the latest `MoonshotAI/main` into the fork feature branch without mutating upstream;
+- retain the fork's split session/auth homes, exact profile model binding, native Responses compaction harness, and owning-home SDK behavior while accepting upstream's new session read-model and live-outcome behavior;
+- keep the merge free of whole-file formatter noise and conflict markers;
+- pass the affected package typechecks, import boundary, focused regressions, and full-suite evidence before pushing only the fork branch.
+
+Recovery boundary: revert merge commit `18f70383775c1645680fb1c385217b40440180a2` on the fork branch. No installed `kiminn`, canonical `~/.kimi-code`, or local gateway artifact was changed by this milestone.
+
+Evidence:
+
+- merge commit `18f70383775c1645680fb1c385217b40440180a2` has parents `255d946577ee01065619d843af8ec21ba4425c76` and upstream `0b2e803d5e71afaab45212bb2ee6117ecbf8bbc9`; it incorporates 23 upstream-only commits;
+- six conflicts were resolved across session-index multi-home reads, exact subagent profile bindings, the provider test harness, zero-timeout swarm coverage, SDK session listing, and SDK integration tests;
+- the combined session index uses upstream's single-flight authoritative scan and pending-write fold in single-home mode, while multi-home mode keeps authoritative ownership checks and fails closed on duplicate session IDs;
+- the exact profile binding now also carries upstream's user-facing display alias; SDK listings keep both owning-home session paths and upstream's live `lastTurnReason` overlay;
+- three relevant typechecks passed; v2 import-boundary verification passed across 1,130 files; focused gates passed 358 v2 tests, 44 SDK tests, and 37 CLI tests, plus the regenerated config-manifest contract;
+- full v2 evidence passed 4,912 non-manifest tests and the manifest test separately; the full SDK suite passed 355 tests plus one todo; the full CLI run passed 2,669 tests plus two skips, and its two resource-contention telemetry timeouts passed 3/3 when rerun alone;
+- formatter noise was removed by rebuilding the six conflict files from Git's three-way merge tree and reapplying only the semantic resolutions; diff checks and a final conflict-marker scan passed.
 
 Local recovery:
 
