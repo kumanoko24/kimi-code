@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-07T22:17:14+08:00`
+- updated_at: `2026-08-08T04:14:03+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
-- current milestone: M10 — upstream sync through `0b2e803d5`
-- status: PASS (`M1` through `M10` independently PASS)
+- current milestone: M11 — upstream sync through `437a1b8ba`
+- status: PASS (`M1` through `M11` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -333,6 +333,24 @@ Evidence:
 - three relevant typechecks passed; v2 import-boundary verification passed across 1,130 files; focused gates passed 358 v2 tests, 44 SDK tests, and 37 CLI tests, plus the regenerated config-manifest contract;
 - full v2 evidence passed 4,912 non-manifest tests and the manifest test separately; the full SDK suite passed 355 tests plus one todo; the full CLI run passed 2,669 tests plus two skips, and its two resource-contention telemetry timeouts passed 3/3 when rerun alone;
 - formatter noise was removed by rebuilding the six conflict files from Git's three-way merge tree and reapplying only the semantic resolutions; diff checks and a final conflict-marker scan passed.
+
+### M11 — upstream MCP auth probe sync (PASS)
+
+Verified at `2026-08-08 04:14 UTC+8`.
+
+Success criteria:
+
+- merge upstream `437a1b8ba` into the fork feature branch without mutating upstream;
+- preserve the fork's separate auth-home and session-home behavior while accepting the SDK's connection-based MCP auth probe;
+- pass the affected agent-core and SDK typechecks plus focused and full SDK tests before pushing only the fork branch.
+
+Recovery boundary: revert merge commit `da08e084aac6ad947c5ceaae6702a39f2b1d0173` on the fork branch. No installed `kiminn`, canonical `~/.kimi-code`, or local gateway artifact was changed.
+
+Evidence:
+
+- merge commit `da08e084aac6ad947c5ceaae6702a39f2b1d0173` has parents `bc7a69dea4e74fe1c719a500c8a6264d57eb4fd2` and upstream `437a1b8ba1b7e0f6662bdadc669564fdc58c3f5a`;
+- the one upstream commit, `fix(sdk): probe MCP auth status through connection (#2731)`, merged cleanly with no conflicts;
+- agent-core and node-SDK typechecks passed; three focused MCP/SDK files passed 115 tests; the full SDK suite passed 355 tests plus one todo.
 
 Local recovery:
 
