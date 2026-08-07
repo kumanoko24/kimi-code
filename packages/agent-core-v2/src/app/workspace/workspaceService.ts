@@ -53,8 +53,8 @@
  */
 
 import { basename, isAbsolute } from 'pathe';
-
-import { LifecycleScope, ScopeActivation, registerScopedService } from '#/_base/di/scope';
+import { LifecycleScope } from '#/app/scopes';
+import { ScopeActivation, registerScopedService } from '#/_base/di/scope';
 import { encodeWorkDirKey, workspaceRootKey } from '#/_base/utils/workdir-slug';
 import { IBootstrapService } from '#/app/bootstrap/bootstrap';
 import { ErrorCodes, Error2, unwrapErrorCause } from '#/errors';

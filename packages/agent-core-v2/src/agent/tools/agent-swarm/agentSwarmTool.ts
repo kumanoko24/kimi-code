@@ -95,11 +95,6 @@ export class AgentSwarmTool implements IAgentSwarmTool {
   declare readonly _serviceBrand: undefined;
   readonly name = 'AgentSwarm' as const;
 
-  /**
-   * The `model` choice only exists while the `secondary-model` experiment is
-   * on; off, the advertised schema drops it so the concept never enters the
-   * prompt. Read live per request (same as `description`).
-   */
   get parameters(): Record<string, unknown> {
     return this.flags.enabled(SECONDARY_MODEL_FLAG_ID)
       ? AGENT_SWARM_PARAMETERS
@@ -191,7 +186,7 @@ export class AgentSwarmTool implements IAgentSwarmTool {
         });
       }
       if (own.modelAlias !== undefined) {
-        binding = resolveSubagentBinding(
+        const resolved = resolveSubagentBinding(
           this.config,
           this.flags,
           { modelAlias: own.modelAlias, thinkingLevel: own.thinkingLevel },
@@ -201,6 +196,7 @@ export class AgentSwarmTool implements IAgentSwarmTool {
             ? undefined
             : { model: targetProfile.model, thinking: targetProfile.thinkingEffort },
         );
+        binding = { model: resolved.model, thinking: resolved.thinking };
       }
     }
     const timeoutMs = resolveSubagentTimeoutMs(this.config);
