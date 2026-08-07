@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-08T04:14:03+08:00`
+- updated_at: `2026-08-08T06:35:37+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
-- current milestone: M11 — upstream sync through `437a1b8ba`
-- status: PASS (`M1` through `M11` independently PASS)
+- current milestone: M12 — isolated `kiminn` v0.34.0 deployment
+- status: PASS (`M1` through `M12` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -351,6 +351,30 @@ Evidence:
 - merge commit `da08e084aac6ad947c5ceaae6702a39f2b1d0173` has parents `bc7a69dea4e74fe1c719a500c8a6264d57eb4fd2` and upstream `437a1b8ba1b7e0f6662bdadc669564fdc58c3f5a`;
 - the one upstream commit, `fix(sdk): probe MCP auth status through connection (#2731)`, merged cleanly with no conflicts;
 - agent-core and node-SDK typechecks passed; three focused MCP/SDK files passed 115 tests; the full SDK suite passed 355 tests plus one todo.
+
+### M12 — isolated `kiminn` v0.34.0 deployment (PASS)
+
+Verified at `2026-08-08 06:35 UTC+8`.
+
+Success criteria:
+
+- build the merged fork branch as a native binary and replace only the isolated `kiminn` installation;
+- retain the isolated config, wrapper, canonical session/auth homes, and canonical Kimi installation unchanged;
+- RBV a new OpenAI Responses turn, resume it from canonical storage, exercise the new MCP HTTP auth challenge probe, and inspect the live 2234 dashboard;
+- record an exact recoverable backup and installed-build receipt.
+
+Recovery boundary: restore the binary and supporting snapshots from `/Users/noelbao/.kiminn/backups/upstream-mcp-auth-probe-20260808-0414/`. The canonical Kimi installation and local gateway need no rollback.
+
+Evidence:
+
+- the native SEA build and native smoke passed at version `0.34.0`; installed `/Users/noelbao/.kiminn/bin/kimi` SHA-256 is `8546a0592c2a90d2ff63dff9a3d6ef77dcf3d41747ab63957f4d7f1225337467`;
+- `kiminn doctor` passed, and the real installed CLI returned exact `KIMINN_UPSTREAM_437A_RBV_OK` for a new turn and exact `KIMINN_UPSTREAM_437A_RESUME_OK` after resuming session `session_1477ba83-b0b1-4bdf-8376-284d0c37e1b3`;
+- the session exists only under canonical `~/.kimi-code/sessions`; its two wire requests prove provider `openai_responses`, model `gpt-5.6-sol`, effort `xhigh`, and `maxTokens=258000`, and both turns ended `completed`;
+- a real loopback HTTP MCP probe through the built merged node SDK classified a normal 404 endpoint as `not-applicable` and an unmarked 401 endpoint as `oauth-required`, exercising upstream commit `437a1b8ba`'s connection-based detection;
+- the 2234 post-resume snapshot was READY with five fresh quota records, three new-session-eligible accounts, zero in-flight requests, and the selected Sol/xhigh session at 2/2 HTTP 200 successes; `http://127.0.0.1:2234/dashboard` returned HTTP 200;
+- isolated config SHA-256 remained `706a623ba8b37a7b218acea5a3eb2866faff15f1f3dfc4cfa3003c3da80cb386` and wrapper SHA-256 remained `6729dac05340fc0da2cb7c153db9f71a55234d49123eac71d106ed6495555693`; the isolated AGENTS snapshot was refreshed to the canonical content at SHA-256 `6630ba000285c945d0f0b89c3e030f1849918e98ea7eb275bb542344dca25cf4`;
+- canonical binary SHA-256 remained `9f4337e10da47843f6b550474012a53ba8b30dd665f83b176a5cd479c5f7e859`, canonical config remained `4ecbe992296a21c2063c31103da5f8cad58bef2f5aa0e180d1bae84927b8bf95`, and canonical AGENTS remained `6630ba000285c945d0f0b89c3e030f1849918e98ea7eb275bb542344dca25cf4`;
+- `/Users/noelbao/.kiminn/install-receipt.toml` records source commit `3cebe0a776721b0b552f7479b24df70e636d2d0d`, upstream `437a1b8ba1b7e0f6662bdadc669564fdc58c3f5a`, the installed hash, split-home ownership, and rollback path.
 
 Local recovery:
 
