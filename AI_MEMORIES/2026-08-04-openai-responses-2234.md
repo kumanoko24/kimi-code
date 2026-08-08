@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-08T06:35:37+08:00`
+- updated_at: `2026-08-08T16:20:49+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
-- current milestone: M12 — isolated `kiminn` v0.34.0 deployment
-- status: PASS (`M1` through `M12` independently PASS)
+- current milestone: M13 — canonical Kimi 2234 configuration removal
+- status: PASS (`M1` through `M13` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -375,6 +375,29 @@ Evidence:
 - isolated config SHA-256 remained `706a623ba8b37a7b218acea5a3eb2866faff15f1f3dfc4cfa3003c3da80cb386` and wrapper SHA-256 remained `6729dac05340fc0da2cb7c153db9f71a55234d49123eac71d106ed6495555693`; the isolated AGENTS snapshot was refreshed to the canonical content at SHA-256 `6630ba000285c945d0f0b89c3e030f1849918e98ea7eb275bb542344dca25cf4`;
 - canonical binary SHA-256 remained `9f4337e10da47843f6b550474012a53ba8b30dd665f83b176a5cd479c5f7e859`, canonical config remained `4ecbe992296a21c2063c31103da5f8cad58bef2f5aa0e180d1bae84927b8bf95`, and canonical AGENTS remained `6630ba000285c945d0f0b89c3e030f1849918e98ea7eb275bb542344dca25cf4`;
 - `/Users/noelbao/.kiminn/install-receipt.toml` records source commit `3cebe0a776721b0b552f7479b24df70e636d2d0d`, upstream `437a1b8ba1b7e0f6662bdadc669564fdc58c3f5a`, the installed hash, split-home ownership, and rollback path.
+
+### M13 — canonical Kimi 2234 configuration removal (PASS)
+
+Verified at `2026-08-08 16:20 UTC+8`.
+
+Success criteria:
+
+- remove only the localhost-2234 provider, its three GPT-5.6 model aliases, and its dedicated Responses-compaction flag from canonical `~/.kimi-code/config.toml`;
+- preserve the canonical Kimi default, managed provider/models, permissions, credentials, sessions, logs, and binary;
+- retain the complete 2234 configuration and behavior in isolated `kiminn`;
+- prove both the canonical provider catalog and rendered model selector contain only managed Kimi choices.
+
+Recovery boundary: restore `/Users/noelbao/.kimi-code/backups/remove-local-2234-20260808-161819/config.toml` to `/Users/noelbao/.kimi-code/config.toml`. The backup is byte-identical to the pre-change config at SHA-256 `4ecbe992296a21c2063c31103da5f8cad58bef2f5aa0e180d1bae84927b8bf95`.
+
+Evidence:
+
+- the surgical diff removes exactly `[providers.local-openai-2234]`, the Sol/Terra/Luna `local-openai-2234/*` model blocks, and the otherwise-empty `[experimental] openai-responses-compaction` section;
+- canonical `default_model = "kimi-code/k3-256k"`, thinking effort `high`, the managed OAuth provider, all four managed models, permissions, credentials, sessions, logs, and binaries were not edited;
+- canonical `kimi doctor` passed and `kimi provider list` reports only `managed:kimi-code`, four models, and default `kimi-code/k3-256k`;
+- the real canonical agent-core-v2 TUI `/model` selector rendered exactly K2.7 Coding, K2.7 Coding Highspeed, K3, and K3-256k, with no localhost or GPT-5.6 choices; no model request or session was created during this v2 check;
+- the post-change canonical config SHA-256 is `b4d4f9f0e7eaa4f19b6ccf21d6653d9c6e845035e57b541ea3885903b159ba69`;
+- isolated `kiminn provider list` still reports `local-openai-2234` with three models plus the managed Kimi provider with four models, `kiminn doctor` passed, and its config SHA-256 remains `706a623ba8b37a7b218acea5a3eb2866faff15f1f3dfc4cfa3003c3da80cb386`;
+- historical session/wire/log/user-history records and binary capability strings were deliberately preserved: they are evidence, not active model-catalog configuration.
 
 Local recovery:
 
