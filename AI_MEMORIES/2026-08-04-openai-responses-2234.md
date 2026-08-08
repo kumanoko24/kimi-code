@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-08T16:24:04+08:00`
+- updated_at: `2026-08-09T05:35:47+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
-- current milestone: M13 — canonical Kimi 2234 configuration removal
-- status: PASS (`M1` through `M13` independently PASS)
+- current milestone: M14 — upstream session-local profile catalog sync
+- status: PASS (`M1` through `M14` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -399,6 +399,31 @@ Evidence:
 - the post-change canonical config SHA-256 is `b4d4f9f0e7eaa4f19b6ccf21d6653d9c6e845035e57b541ea3885903b159ba69`;
 - isolated `kiminn provider list` still reports `local-openai-2234` with three models plus the managed Kimi provider with four models, `kiminn doctor` passed, and its config SHA-256 remains `706a623ba8b37a7b218acea5a3eb2866faff15f1f3dfc4cfa3003c3da80cb386`;
 - historical session/wire/log/user-history records and binary capability strings were deliberately preserved: they are evidence, not active model-catalog configuration.
+
+### M14 — upstream session-local profile catalog sync (PASS)
+
+Verified at `2026-08-09 05:35 UTC+8`.
+
+Success criteria:
+
+- fetch and merge the current upstream `01c74e937` without mutating upstream;
+- preserve the fork's exact file-profile model/thinking bindings while accepting session-local builtin profile cloning;
+- pass affected and full agent-core regressions, rebuild/install only isolated `kiminn`, and preserve canonical `kimi`;
+- RBV the installed binary through a real custom tasker delegation and live 2234 observability.
+
+Recovery boundary: revert merge commit `e49f4c1e66dbac187c41d7666e7aa4f5034ff2df` on the fork branch and restore `/Users/noelbao/.kiminn` from `/Users/noelbao/.kiminn/backups/upstream-profile-catalog-20260809-053417/`. No canonical Kimi or gateway rollback is required.
+
+Evidence:
+
+- upstream advanced by exactly one commit, `01c74e9372fcbbbe99614e859b53b505ed1664a8 fix(agent-core): isolate builtin profile catalogs per session (#2740)`; merge commit `e49f4c1e66dbac187c41d7666e7aa4f5034ff2df` completed automatically with no conflicts;
+- upstream clones builtin profile objects, tool arrays, disallowed-tool arrays, and delegation edges per session; the fork's exact `model` and `thinkingEffort` fields remain preserved by the object spread and file-profile projection;
+- agent-core typecheck passed, the combined profile catalog file passed 40/40 tests, and the full agent-core suite passed 225 files with 4,141 tests, three expected failures, 30 skips, and one todo;
+- native SEA build, code-sign verification, and native smoke passed at version `0.34.0`; isolated binary SHA-256 is `904af369da1288b630ee936aeda561e7fba1b61f91cf2db3c002602009f65275`;
+- installed `kiminn doctor` passed; session `session_b34be432-e2b0-4a39-aa2b-6f619d669cb4` invoked `gpt-coder-tasker`, the child returned exact `TASKER_SESSION_LOCAL_OK`, and the parent returned exact `KIMINN_PROFILE_CATALOG_RBV_OK`;
+- wire facts prove the parent remained OpenAI Responses Sol/xhigh/258000 and the child used OpenAI Responses Luna/max/258000; both turns completed;
+- the live 2234 dashboard was READY with zero in-flight requests; the corresponding explicit-affinity Responses session completed 3/3 requests with HTTP 200;
+- isolated config and wrapper hashes remain `706a623ba8b37a7b218acea5a3eb2866faff15f1f3dfc4cfa3003c3da80cb386` and `6729dac05340fc0da2cb7c153db9f71a55234d49123eac71d106ed6495555693`;
+- canonical binary remains `9f4337e10da47843f6b550474012a53ba8b30dd665f83b176a5cd479c5f7e859`; its current config is the clean pre-2234 configuration at SHA-256 `15ca0bd8058389b9f676d32c55ab50cee6e48a631fddac84faaf0d11e9a0ea9d`, with no localhost model aliases.
 
 Local recovery:
 
