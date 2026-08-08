@@ -1,6 +1,6 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-08T16:20:49+08:00`
+- updated_at: `2026-08-08T16:24:04+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
 - current milestone: M13 — canonical Kimi 2234 configuration removal
 - status: PASS (`M1` through `M13` independently PASS)
@@ -392,9 +392,10 @@ Recovery boundary: restore `/Users/noelbao/.kimi-code/backups/remove-local-2234-
 Evidence:
 
 - the surgical diff removes exactly `[providers.local-openai-2234]`, the Sol/Terra/Luna `local-openai-2234/*` model blocks, and the otherwise-empty `[experimental] openai-responses-compaction` section;
-- canonical `default_model = "kimi-code/k3-256k"`, thinking effort `high`, the managed OAuth provider, all four managed models, permissions, credentials, sessions, logs, and binaries were not edited;
+- canonical `default_model = "kimi-code/k3-256k"`, thinking effort `high`, the managed OAuth provider, all four managed models, permissions, credentials, pre-existing sessions, and binaries were not rewritten or removed;
 - canonical `kimi doctor` passed and `kimi provider list` reports only `managed:kimi-code`, four models, and default `kimi-code/k3-256k`;
 - the real canonical agent-core-v2 TUI `/model` selector rendered exactly K2.7 Coding, K2.7 Coding Highspeed, K3, and K3-256k, with no localhost or GPT-5.6 choices; no model request or session was created during this v2 check;
+- a preliminary legacy-selector check created one empty diagnostic session with no turns; after backing up its two files under the M13 recovery directory, the public legacy SDK deleted that exact session and confirmed `before=1`, `after=0`, leaving the session index's normal delete tombstone rather than an inconsistent manual removal;
 - the post-change canonical config SHA-256 is `b4d4f9f0e7eaa4f19b6ccf21d6653d9c6e845035e57b541ea3885903b159ba69`;
 - isolated `kiminn provider list` still reports `local-openai-2234` with three models plus the managed Kimi provider with four models, `kiminn doctor` passed, and its config SHA-256 remains `706a623ba8b37a7b218acea5a3eb2866faff15f1f3dfc4cfa3003c3da80cb386`;
 - historical session/wire/log/user-history records and binary capability strings were deliberately preserved: they are evidence, not active model-catalog configuration.
