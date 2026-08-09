@@ -1,8 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-10T07:38:27+08:00`
+- updated_at: `2026-08-10T07:41:29+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
 - current milestone: M15 — live AGENTS link and Digital Noel capability audit
+- next milestones: M16 — kiminn 2234 session usage and account observability; M17 — kiminn tmux pane identity (PENDING)
 - status: PASS (`M1` through `M15` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
@@ -445,6 +446,51 @@ Evidence:
 - the same SDK global-MCP inventory reports `digital_noel_memory`, `new_asr_transcriptions`, and `noel_tmux_partner_mesh` for canonical `kimi-code`, but zero global MCP registrations for `kiminn` because `/Users/noelbao/.kiminn/mcp.json` is absent;
 - Codex ATK has both `/Users/noelbao/.codex-atk/skills/digital-noel-memory/SKILL.md` and an enabled `mcp_servers.digital_noel_memory` registration; the current Codex runtime exposes Digital Noel MCP tools, although its exposed tool set does not include the skill document's newer `memory_start_session` or `memory_context_pack` methods;
 - no MCP config, credentials, sessions, or source code were changed during this audit.
+
+### M16 — kiminn 2234 session usage and account observability (PENDING)
+
+Intent:
+
+- extend isolated `kiminn` `/usage` with the localhost-2234 account selected for the current kiminn session, that exact account's quota windows / remaining capacity / reset time, and session cache-hit statistics;
+- add a compact TUI status presentation for the selected safe account label and cache-hit rate while keeping the full detail in `/usage`;
+- keep canonical `kimi` behavior and configuration unchanged.
+
+Design constraints:
+
+- keep the client mechanism provider-configurable; do not hardcode port `2234` or a gateway-specific wire shape into generic TUI components;
+- use a loopback-only, read-only observability contract to join kiminn's stable session affinity to the gateway's selected account and quota record;
+- expose only a safe local account label and aggregate usage facts; never surface account IDs, email addresses, tokens, authorization headers, raw sticky keys, or other credentials in `/v1/*`, the TUI, logs, or telemetry;
+- preserve the gateway data-plane boundary: ordinary `/v1/*` responses must continue to omit `X-Pool-Auth-Label` and other routing internals;
+- distinguish `not observed yet`, gateway unavailable, session unknown, stale quota, missing upstream usage, and zero cache hits instead of collapsing them into zero or success;
+- compute cache hit rate from observed usage records and report the observed / missing-usage request counts so the denominator is auditable.
+
+Promotion criteria and RBV:
+
+- before the first model request, `/usage` and the compact TUI status show a truthful `not observed yet` state without breaking existing local token/context usage;
+- after a real Responses request, the UI resolves the exact gateway-selected safe account label, joins the same account's fresh quota data, and matches the live gateway snapshot;
+- after resuming the same session, the stable affinity and accumulated request/cache counters remain associated with that session;
+- a real request with upstream cached-input usage changes the displayed cache-hit numerator and rate; missing usage remains explicitly counted rather than guessed;
+- gateway-down, stale-quota, session-missing, and account-switch/migration paths degrade visibly and recover after the gateway becomes healthy;
+- canonical `kimi` retains its managed-Kimi `/usage` behavior and contains no localhost-2234 UI or configuration changes.
+
+Recovery boundary: revert the future M16 client commit and its paired gateway commit/config deployment independently. The implementation must retain the current M15 installed binary and gateway release as explicit rollback artifacts until M16 RBV passes.
+
+### M17 — kiminn tmux pane identity (PENDING)
+
+Intent:
+
+- show `pane_id=%nn` in the isolated kiminn TUI when the process environment contains a valid `TMUX_PANE=%nn` value;
+- omit the field entirely outside tmux or when the value is absent/invalid;
+- keep canonical `kimi` behavior unchanged.
+
+Promotion criteria and RBV:
+
+- a real kiminn process launched inside tmux renders the exact pane identifier from its own environment without shelling out or guessing from the active pane;
+- two simultaneous panes display their respective IDs, including when one pane is not currently focused;
+- a real kiminn process launched outside tmux shows no empty placeholder or stale pane ID;
+- resize/re-render and session resume preserve the correct display, and the value is not written into model prompts, API headers, session history, or telemetry.
+
+Recovery boundary: revert the future M17 client/config commit and restore the prior isolated kiminn binary; no gateway or canonical Kimi rollback is required.
 
 Local recovery:
 
