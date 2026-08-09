@@ -29,6 +29,8 @@ export interface AppState {
   workDir: string;
   additionalDirs: readonly string[];
   sessionId: string;
+  /** Validated identity from TMUX_PANE; rendered only by the opt-in pane slot. */
+  tmuxPaneId?: string;
   permissionMode: PermissionMode;
   planMode: boolean;
   /** Resolved profile name from --agent/--agent-file, carried to the

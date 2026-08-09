@@ -148,6 +148,7 @@ import { ImageAttachmentStore, type ImageAttachment } from './utils/image-attach
 import { extractMediaAttachments, rewriteMediaPlaceholders } from './utils/image-placeholder';
 import type { ExtractionResult } from './utils/image-placeholder';
 import { installInputLatencyProbe } from './utils/input-latency';
+import { normalizeTmuxPaneId } from './utils/tmux-pane';
 import { startupTrace } from '#/utils/startup-trace';
 import { REPLAY_TURN_LIMIT } from './utils/message-replay';
 import { hasPatchChanges } from './utils/object-patch';
@@ -229,6 +230,7 @@ function createInitialAppState(input: KimiTUIStartupInput): AppState {
     workDir: input.workDir,
     additionalDirs: [...(input.additionalDirs ?? [])],
     sessionId: '',
+    tmuxPaneId: normalizeTmuxPaneId(process.env['TMUX_PANE']),
     permissionMode: startupPermission,
     planMode: input.cliOptions.plan,
     inputMode: 'prompt',

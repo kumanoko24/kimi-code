@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { FooterComponent } from '#/tui/components/chrome/footer';
+import { normalizeTmuxPaneId } from '#/tui/utils/tmux-pane';
 import {
   runStatusLineCommand,
   STATUS_LINE_MAX_CAPTURE_BYTES,
@@ -60,6 +61,22 @@ function plain(text: string): string {
 }
 
 describe('FooterComponent status_line items', () => {
+  it('renders the validated tmux pane identity when the pane slot is enabled', () => {
+    const state: AppState = {
+      ...baseState,
+      tmuxPaneId: '%148',
+      statusLine: { items: ['pane'], command: null },
+    };
+
+    expect(plain(new FooterComponent(state).render(120)[0]!)).toContain('pane_id=%148');
+  });
+
+  it('keeps tmux pane identity out of the default layout', () => {
+    const state: AppState = { ...baseState, tmuxPaneId: '%148' };
+
+    expect(plain(new FooterComponent(state).render(120)[0]!)).not.toContain('pane_id=');
+  });
+
   it('renders only the chosen slots in the given order', () => {
     const state: AppState = {
       ...baseState,
@@ -130,6 +147,18 @@ describe('FooterComponent status_line items', () => {
     const footer = new FooterComponent(state);
 
     expect(plain(footer.render(120)[0]!).trim()).toBe('');
+  });
+});
+
+describe('normalizeTmuxPaneId', () => {
+  it('accepts tmux pane identifiers from the process environment', () => {
+    expect(normalizeTmuxPaneId('%148')).toBe('%148');
+  });
+
+  it('omits absent or malformed pane identifiers', () => {
+    expect(normalizeTmuxPaneId(undefined)).toBeUndefined();
+    expect(normalizeTmuxPaneId('148')).toBeUndefined();
+    expect(normalizeTmuxPaneId('%1x')).toBeUndefined();
   });
 });
 

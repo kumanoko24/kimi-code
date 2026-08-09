@@ -364,6 +364,7 @@ export class FooterComponent implements Component {
       goal: [],
       model: [],
       tasks: [],
+      pane: [],
       cwd: [],
       git: [],
       tips: [],
@@ -425,6 +426,10 @@ export class FooterComponent implements Component {
       );
     }
     slots['tasks'] = taskBadges;
+
+    if (state.tmuxPaneId !== undefined) {
+      slots['pane'] = [chalk.hex(colors.textDim)(`pane_id=${state.tmuxPaneId}`)];
+    }
 
     const cwd = shortenCwd(state.workDir);
     if (cwd) slots['cwd'] = [chalk.hex(colors.textDim)(cwd)];
