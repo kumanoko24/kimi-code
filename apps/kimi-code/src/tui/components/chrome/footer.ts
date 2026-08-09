@@ -364,6 +364,7 @@ export class FooterComponent implements Component {
       goal: [],
       model: [],
       tasks: [],
+      provider: [],
       pane: [],
       cwd: [],
       git: [],
@@ -426,6 +427,22 @@ export class FooterComponent implements Component {
       );
     }
     slots['tasks'] = taskBadges;
+
+    const provider = state.providerObservability;
+    if (provider !== undefined) {
+      const summary =
+        provider.kind === 'observed'
+          ? `account=${provider.accountLabel ?? 'unknown'} cache=${
+              provider.cacheHitRatio === undefined
+                ? 'n/a'
+                : `${(provider.cacheHitRatio * 100).toFixed(1)}%`
+            }`
+          : provider.kind === 'not_observed'
+            ? 'account=not-observed cache=n/a'
+            : 'provider-usage=unavailable';
+      const token = provider.kind === 'error' ? 'warning' : 'textDim';
+      slots['provider'] = [chalk.hex(colors[token])(summary)];
+    }
 
     if (state.tmuxPaneId !== undefined) {
       slots['pane'] = [chalk.hex(colors.textDim)(`pane_id=${state.tmuxPaneId}`)];

@@ -24,6 +24,36 @@ export interface BannerState {
   ttlHours?: number;
 }
 
+export interface ProviderQuotaWindow {
+  readonly remaining?: number;
+  readonly resetAt?: number;
+}
+
+export interface ProviderObservabilityState {
+  readonly kind: 'observed' | 'not_observed' | 'error';
+  readonly provider: string;
+  readonly message?: string;
+  readonly accountLabel?: string;
+  readonly accountHealthy?: boolean;
+  readonly quotaState?: 'fresh' | 'last_known_good' | 'stale' | 'unavailable';
+  readonly quotaAgeSeconds?: number;
+  readonly fiveHour?: ProviderQuotaWindow;
+  readonly weekly?: ProviderQuotaWindow;
+  readonly requestCount?: number;
+  readonly terminalCount?: number;
+  readonly successCount?: number;
+  readonly failureCount?: number;
+  readonly usageObservedCount?: number;
+  readonly usageMissingCount?: number;
+  readonly inputTokens?: number;
+  readonly cachedInputTokens?: number;
+  readonly outputTokens?: number;
+  readonly reasoningTokens?: number;
+  readonly cacheHitRatio?: number;
+  readonly lastActivityAgeSeconds?: number;
+  readonly inFlightCount?: number;
+}
+
 export interface AppState {
   model: string;
   workDir: string;
@@ -79,6 +109,8 @@ export interface AppState {
   statusLine?: StatusLineConfig;
   availableModels: Record<string, ModelAlias>;
   availableProviders: Record<string, ProviderConfig>;
+  /** Safe, aggregate facts from the active provider's opt-in local observability endpoint. */
+  providerObservability?: ProviderObservabilityState;
   sessionTitle: string | null;
   /** Current goal snapshot for the footer badge; null/undefined when no active goal. */
   goal?: GoalSnapshot | null;

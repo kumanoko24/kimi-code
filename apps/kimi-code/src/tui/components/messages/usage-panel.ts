@@ -8,6 +8,7 @@ import type { Component } from '@moonshot-ai/pi-tui';
 import { truncateToWidth, visibleWidth } from '@moonshot-ai/pi-tui';
 import { formatDuration } from '@moonshot-ai/kimi-code-oauth';
 import type { SessionUsage, TokenUsage } from '@moonshot-ai/kimi-code-sdk';
+import type { ProviderObservabilityState } from '#/tui/types';
 
 import {
   formatTokenCount,
@@ -80,6 +81,7 @@ export interface UsageReportOptions {
   readonly maxContextTokens: number;
   readonly managedUsage?: ManagedUsageReport;
   readonly managedUsageError?: string;
+  readonly providerObservability?: ProviderObservabilityState;
 }
 
 export interface ManagedUsageReportLineOptions {
@@ -328,6 +330,58 @@ export function buildUsageReportLines(options: UsageReportOptions): string[] {
   if (extraSection.length > 0) {
     lines.push('');
     lines.push(...extraSection);
+  }
+
+  const provider = options.providerObservability;
+  if (provider !== undefined) {
+    lines.push('');
+    lines.push(accent('Provider session'));
+    if (provider.kind === 'error') {
+      lines.push(errorStyle(`  ${provider.message ?? 'Provider observability unavailable.'}`));
+    } else if (provider.kind === 'not_observed') {
+      lines.push(muted('  Not observed yet. Send a model request first.'));
+    } else {
+      lines.push(`  ${muted('Account')}  ${value(provider.accountLabel ?? 'unknown')}`);
+      const quotaStatus = provider.quotaState ?? 'unavailable';
+      const quotaAge =
+        provider.quotaAgeSeconds === undefined
+          ? ''
+          : ` · updated ${formatDuration(Math.floor(provider.quotaAgeSeconds))} ago`;
+      lines.push(`  ${muted('Quota')}    ${value(quotaStatus)}${muted(quotaAge)}`);
+      for (const [label, window] of [
+        ['5-hour', provider.fiveHour],
+        ['Weekly', provider.weekly],
+      ] as const) {
+        if (window?.remaining === undefined) continue;
+        const reset =
+          window.resetAt === undefined
+            ? ''
+            : ` · resets in ${formatDuration(
+                Math.max(0, Math.floor(window.resetAt - Date.now() / 1000)),
+              )}`;
+        lines.push(
+          `  ${muted(label.padEnd(8))} ${value(`${window.remaining.toFixed(1)}% remaining`)}${muted(reset)}`,
+        );
+      }
+      const cache =
+        provider.cacheHitRatio === undefined
+          ? 'n/a'
+          : `${(provider.cacheHitRatio * 100).toFixed(1)}%`;
+      lines.push(
+        `  ${muted('Cache hit')} ${value(cache)}  ${muted(
+          `(${formatTokenCount(provider.cachedInputTokens ?? 0)} / ${formatTokenCount(
+            provider.inputTokens ?? 0,
+          )} input tokens)`,
+        )}`,
+      );
+      lines.push(
+        `  ${muted('Requests')}  ${value(String(provider.requestCount ?? 0))}  ${muted(
+          `usage observed ${String(provider.usageObservedCount ?? 0)} · missing ${String(
+            provider.usageMissingCount ?? 0,
+          )}`,
+        )}`,
+      );
+    }
   }
 
   return lines;

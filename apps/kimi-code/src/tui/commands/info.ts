@@ -23,6 +23,7 @@ import {
 import { DEFAULT_OAUTH_PROVIDER_NAME, isManagedUsageProvider } from '../constant/kimi-tui';
 import { submitFeedbackWithAttachments } from '../../feedback/feedback-attachments';
 import { formatErrorMessage } from '../utils/event-payload';
+import { refreshProviderObservability } from '../utils/provider-observability';
 import { openUrl } from '#/utils/open-url';
 import { promptFeedbackAttachment, promptFeedbackInput } from './prompts';
 import type { SlashCommandHost } from './dispatch';
@@ -145,8 +146,14 @@ interface ManagedUsageResult {
 }
 
 export async function showUsage(host: SlashCommandHost): Promise<void> {
-  const sessionUsage = await loadSessionUsageReport(host);
-  const managedUsage = await loadManagedUsageReport(host);
+  const [sessionUsage, managedUsage, providerObservability] = await Promise.all([
+    loadSessionUsageReport(host),
+    loadManagedUsageReport(host),
+    refreshProviderObservability({
+      state: host.state.appState,
+      setState: (patch) => host.setAppState(patch),
+    }),
+  ]);
   const reportArgs = {
     sessionUsage: sessionUsage.usage,
     sessionUsageError: sessionUsage.error,
@@ -155,6 +162,7 @@ export async function showUsage(host: SlashCommandHost): Promise<void> {
     maxContextTokens: host.state.appState.maxContextTokens,
     managedUsage: managedUsage?.usage,
     managedUsageError: managedUsage?.error,
+    providerObservability,
   };
   const panel = new UsagePanelComponent(() => buildUsageReportLines(reportArgs), 'primary');
   host.state.transcriptContainer.addChild(panel);

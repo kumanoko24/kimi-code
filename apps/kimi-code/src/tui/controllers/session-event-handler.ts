@@ -106,6 +106,7 @@ export interface SessionEventHost {
   updateActivityPane(): void;
   track(event: string, props?: Record<string, unknown>): void;
   recordSessionActivity(): void;
+  refreshProviderObservability?(): Promise<void>;
   noteStepUsage(usage: TokenUsage | undefined): void;
   noteCompactionFinished(): void;
   mountEditorReplacement(panel: Component & Focusable): void;
@@ -370,6 +371,7 @@ export class SessionEventHandler {
     this.host.streamingUI.resetToolUi();
     this.host.streamingUI.finalizeTurn(sendQueued);
     this.host.recordSessionActivity();
+    void this.host.refreshProviderObservability?.();
     this.renderPendingModelBlockedFallback();
     this.currentTurnHasAssistantText = false;
     this.goalCompletionTurnEnded = true;

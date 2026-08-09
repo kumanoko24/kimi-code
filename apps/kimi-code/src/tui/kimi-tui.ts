@@ -148,6 +148,7 @@ import { ImageAttachmentStore, type ImageAttachment } from './utils/image-attach
 import { extractMediaAttachments, rewriteMediaPlaceholders } from './utils/image-placeholder';
 import type { ExtractionResult } from './utils/image-placeholder';
 import { installInputLatencyProbe } from './utils/input-latency';
+import { refreshProviderObservability as refreshProviderObservabilityState } from './utils/provider-observability';
 import { normalizeTmuxPaneId } from './utils/tmux-pane';
 import { startupTrace } from '#/utils/startup-trace';
 import { REPLAY_TURN_LIMIT } from './utils/message-replay';
@@ -1643,6 +1644,13 @@ export class KimiTUI {
     this.state.ui.requestRender();
   }
 
+  async refreshProviderObservability(): Promise<void> {
+    await refreshProviderObservabilityState({
+      state: this.state.appState,
+      setState: (patch) => this.setAppState(patch),
+    });
+  }
+
   patchLivePane(patch: Partial<LivePaneState>): void {
     if (!hasPatchChanges(this.state.livePane, patch)) return;
     Object.assign(this.state.livePane, patch);
@@ -1874,6 +1882,7 @@ export class KimiTUI {
       sessionTitle: session.summary?.title ?? null,
       goal: goalResult.goal,
     });
+    void this.refreshProviderObservability();
     this.syncAdditionalDirs(session);
   }
 
@@ -1998,7 +2007,7 @@ export class KimiTUI {
     this.state.footer.setBackgroundCounts({ bashTasks: 0, agentTasks: 0 });
     this.streamingUI.setTodoList([]);
     this.streamingUI.setTurnId(undefined);
-    this.setAppState({ mcpServersSummary: null });
+    this.setAppState({ mcpServersSummary: null, providerObservability: undefined });
     this.streamingUI.setStep(0);
     this.streamingUI.resetLiveText();
     this.updateQueueDisplay();

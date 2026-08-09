@@ -308,6 +308,7 @@ merge_all_available_skills = true
   # custom_headers: record<string, string>
   # cache_key_header: string
   # native_compaction: boolean
+  # observability_url: string
   # default_model: string
   # type: string
   # api_key: string

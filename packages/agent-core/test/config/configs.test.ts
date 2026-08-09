@@ -160,6 +160,7 @@ api_key = "test-key"
 base_url = "https://api.example.test/v1"
 cache_key_header = "X-Session-ID"
 native_compaction = true
+observability_url = "http://127.0.0.1:2234/dashboard/api/session"
 `,
       'config.toml',
     );
@@ -168,6 +169,7 @@ native_compaction = true
       type: 'openai_responses',
       cacheKeyHeader: 'X-Session-ID',
       nativeCompaction: true,
+      observabilityUrl: 'http://127.0.0.1:2234/dashboard/api/session',
     });
     expect(() =>
       parseConfigString(

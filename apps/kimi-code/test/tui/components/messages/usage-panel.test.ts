@@ -13,6 +13,49 @@ function strip(text: string): string {
 }
 
 describe('UsagePanelComponent', () => {
+  it('formats the selected provider account, quota, cache, and usage coverage', () => {
+    const lines = buildUsageReportLines({
+      sessionUsage: { byModel: {} },
+      contextUsage: 0,
+      contextTokens: 0,
+      maxContextTokens: 0,
+      providerObservability: {
+        kind: 'observed',
+        provider: 'local-openai',
+        accountLabel: 'codex-example',
+        quotaState: 'fresh',
+        weekly: { remaining: 61 },
+        requestCount: 4,
+        usageObservedCount: 3,
+        usageMissingCount: 1,
+        inputTokens: 1000,
+        cachedInputTokens: 750,
+        cacheHitRatio: 0.75,
+      },
+    }).map(strip);
+
+    const output = lines.join('\n');
+    expect(output).toContain('Provider session');
+    expect(output).toContain('codex-example');
+    expect(output).toContain('61.0% remaining');
+    expect(output).toContain('75.0%');
+    expect(output).toContain('usage observed 3 · missing 1');
+  });
+
+  it('distinguishes a session that has not reached the provider yet', () => {
+    const output = buildUsageReportLines({
+      sessionUsage: { byModel: {} },
+      contextUsage: 0,
+      contextTokens: 0,
+      maxContextTokens: 0,
+      providerObservability: { kind: 'not_observed', provider: 'local-openai' },
+    })
+      .map(strip)
+      .join('\n');
+
+    expect(output).toContain('Not observed yet. Send a model request first.');
+  });
+
   it('formats session, context, and managed usage sections', () => {
     // Freeze the clock so the resetAt fixture is an exact hour out — with a
     // live clock the elapsed milliseconds floor the diff down to 59m.

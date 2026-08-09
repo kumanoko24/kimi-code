@@ -35,6 +35,7 @@ export const STATUS_LINE_ITEMS = [
   'goal',
   'model',
   'tasks',
+  'provider',
   'pane',
   'cwd',
   'git',

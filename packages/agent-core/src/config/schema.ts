@@ -37,6 +37,7 @@ export const ProviderConfigSchema = z.object({
   customHeaders: StringRecordSchema.optional(),
   cacheKeyHeader: HttpHeaderNameSchema.optional(),
   nativeCompaction: z.boolean().optional(),
+  observabilityUrl: z.string().optional(),
   source: z.record(z.string(), z.unknown()).optional(),
 });
 

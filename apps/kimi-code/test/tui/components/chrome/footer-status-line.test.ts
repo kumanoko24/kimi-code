@@ -77,6 +77,23 @@ describe('FooterComponent status_line items', () => {
     expect(plain(new FooterComponent(state).render(120)[0]!)).not.toContain('pane_id=');
   });
 
+  it('renders the selected provider account and cache ratio in the provider slot', () => {
+    const state: AppState = {
+      ...baseState,
+      providerObservability: {
+        kind: 'observed',
+        provider: 'local-openai',
+        accountLabel: 'codex-example',
+        cacheHitRatio: 0.625,
+      },
+      statusLine: { items: ['provider'], command: null },
+    };
+
+    expect(plain(new FooterComponent(state).render(120)[0]!)).toContain(
+      'account=codex-example cache=62.5%',
+    );
+  });
+
   it('renders only the chosen slots in the given order', () => {
     const state: AppState = {
       ...baseState,

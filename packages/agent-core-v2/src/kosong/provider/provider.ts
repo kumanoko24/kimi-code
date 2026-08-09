@@ -37,6 +37,7 @@ export interface ProviderConfig {
   customHeaders?: Record<string, string>;
   cacheKeyHeader?: string;
   nativeCompaction?: boolean;
+  observabilityUrl?: string;
   defaultModel?: string;
 
   type?: ProviderType;
