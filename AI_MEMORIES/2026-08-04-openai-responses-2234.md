@@ -1,9 +1,9 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-09T05:35:47+08:00`
+- updated_at: `2026-08-10T07:38:27+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
-- current milestone: M14 — upstream session-local profile catalog sync
-- status: PASS (`M1` through `M14` independently PASS)
+- current milestone: M15 — live AGENTS link and Digital Noel capability audit
+- status: PASS (`M1` through `M15` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
@@ -424,6 +424,27 @@ Evidence:
 - the live 2234 dashboard was READY with zero in-flight requests; the corresponding explicit-affinity Responses session completed 3/3 requests with HTTP 200;
 - isolated config and wrapper hashes remain `706a623ba8b37a7b218acea5a3eb2866faff15f1f3dfc4cfa3003c3da80cb386` and `6729dac05340fc0da2cb7c153db9f71a55234d49123eac71d106ed6495555693`;
 - canonical binary remains `9f4337e10da47843f6b550474012a53ba8b30dd665f83b176a5cd479c5f7e859`; its current config is the clean pre-2234 configuration at SHA-256 `15ca0bd8058389b9f676d32c55ab50cee6e48a631fddac84faaf0d11e9a0ea9d`, with no localhost model aliases.
+
+### M15 — live AGENTS link and Digital Noel capability audit (PASS)
+
+Verified at `2026-08-10 07:38 UTC+8`.
+
+Success criteria:
+
+- replace the stale isolated AGENTS snapshot with a live symlink to `~/AGENTS.md` without changing canonical Kimi;
+- preserve a byte-exact rollback copy and reflect the link in the isolated install receipt;
+- use the real v2 SDK catalogs to audit Digital Noel MCP and skill availability for both Kimi homes without creating sessions or exposing credentials.
+
+Recovery boundary: replace `/Users/noelbao/.kiminn/AGENTS.md` with `/Users/noelbao/.kiminn/backups/agents-link-20260810-073711/AGENTS.md`. The pre-link snapshot SHA-256 is `6630ba000285c945d0f0b89c3e030f1849918e98ea7eb275bb542344dca25cf4`.
+
+Evidence:
+
+- `/Users/noelbao/.kiminn/AGENTS.md` is now a symlink to `/Users/noelbao/AGENTS.md`, matching canonical `/Users/noelbao/.kimi-code/AGENTS.md`; all three resolve to SHA-256 `5b38763d912b7a078e95c7be49d143e677d2485aceda341a19b3486b2ba5313c` at verification time;
+- the isolated install receipt records the live source, link target, target hash at link time, and dedicated rollback path; `kiminn doctor` remains PASS;
+- the session-less v2 SDK catalog reports `digital-noel-memory` for both `kimi-code` and `kiminn`, sourced from `/Users/noelbao/.agents/skills/digital-noel-memory/SKILL.md`;
+- the same SDK global-MCP inventory reports `digital_noel_memory`, `new_asr_transcriptions`, and `noel_tmux_partner_mesh` for canonical `kimi-code`, but zero global MCP registrations for `kiminn` because `/Users/noelbao/.kiminn/mcp.json` is absent;
+- Codex ATK has both `/Users/noelbao/.codex-atk/skills/digital-noel-memory/SKILL.md` and an enabled `mcp_servers.digital_noel_memory` registration; the current Codex runtime exposes Digital Noel MCP tools, although its exposed tool set does not include the skill document's newer `memory_start_session` or `memory_context_pack` methods;
+- no MCP config, credentials, sessions, or source code were changed during this audit.
 
 Local recovery:
 
