@@ -1,15 +1,15 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-10T07:41:29+08:00`
-- objective: retain native OpenAI Responses support while adding isolated `kiminn` model-routed subagents and safe over-window compaction
-- current milestone: M15 — live AGENTS link and Digital Noel capability audit
-- next milestones: M16 — kiminn 2234 session usage and account observability; M17 — kiminn tmux pane identity (PENDING)
-- status: PASS (`M1` through `M15` independently PASS)
+- updated_at: `2026-08-10T08:17:24+08:00`
+- objective: retain native OpenAI Responses support while adding isolated `kiminn` provider observability, tmux identity, and managed-Kimi video fallback
+- current milestone: M18 — managed Kimi K3 video fallback
+- next milestones: none
+- status: PASS (`M1` through `M18` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
-- gateway commits: `4075d67`, `d45deb0`
-- live rollback boundary: deployed gateway artifact `24db43a15ec0d74e5566dabdba877b469bd22f5c758f99a9203c1a2d4dfefa55.whl`
+- gateway commits: `4075d67`, `d45deb0`, `b383c5c`
+- live rollback boundary: restore isolated files from `/Users/noelbao/.kiminn/backups/m16-m18-20260810-0811/` and roll gateway artifact `09b8dbd1ceb537acb27c3e875474017b851a0ced489d92a86457e6a171c7eab5.whl` back to `f395b5ccc08399b99f04c1aafed68da6385588ef6a4b5fea6c952eaa34b0be2c.whl`
 
 ## Invariants
 
@@ -447,7 +447,7 @@ Evidence:
 - Codex ATK has both `/Users/noelbao/.codex-atk/skills/digital-noel-memory/SKILL.md` and an enabled `mcp_servers.digital_noel_memory` registration; the current Codex runtime exposes Digital Noel MCP tools, although its exposed tool set does not include the skill document's newer `memory_start_session` or `memory_context_pack` methods;
 - no MCP config, credentials, sessions, or source code were changed during this audit.
 
-### M16 — kiminn 2234 session usage and account observability (PENDING)
+### M16 — kiminn 2234 session usage and account observability (PASS)
 
 Intent:
 
@@ -473,9 +473,18 @@ Promotion criteria and RBV:
 - gateway-down, stale-quota, session-missing, and account-switch/migration paths degrade visibly and recover after the gateway becomes healthy;
 - canonical `kimi` retains its managed-Kimi `/usage` behavior and contains no localhost-2234 UI or configuration changes.
 
-Recovery boundary: revert the future M16 client commit and its paired gateway commit/config deployment independently. The implementation must retain the current M15 installed binary and gateway release as explicit rollback artifacts until M16 RBV passes.
+Recovery boundary: revert client commit `0697d50d5` and gateway commit `b383c5c` independently; restore the isolated binary/config from `/Users/noelbao/.kiminn/backups/m16-m18-20260810-0811/` and use the gateway deployer's optimistic rollback from artifact `09b8dbd1…` to `f395b5cc…`.
 
-### M17 — kiminn tmux pane identity (PENDING)
+Evidence:
+
+- the gateway deploy adapter ran every fixed release gate and activated loopback-only wheel `09b8dbd1ceb537acb27c3e875474017b851a0ced489d92a86457e6a171c7eab5.whl` from commit `b383c5c59c202ba8435c7451fd9b055c27ea059d`; PID `17059` has verified argv/ancestry and binds only `127.0.0.1:2234`;
+- before any request, `GET /dashboard/api/session` with a new session identity returned HTTP 404 and `state=not_observed`; the endpoint is read-only, loopback-only, `no-store`, hashes the raw affinity locally, and returns no credential, email, account ID, or raw sticky key;
+- real installed session `session_32ba77f5-f2db-4296-8454-878c8727b99b` returned exact `KIMINN_M16_PROVIDER_OBSERVABILITY_OK`; its exact join returned safe account `codex-leo`, fresh weekly quota `93.0%`, one successful request, `usage observed 1 · missing 0`, and `0 / 27.3k` cached-input tokens;
+- Human-PoV TUI capture showed `/usage` with the same account/quota/cache facts and the footer `account=codex-leo cache=0.0%`; the video-RBV session later showed `27,136 / 56,060` cached input tokens (`48.4%`) and the exact selected account `codex-fst`, proving the cached numerator and session-specific routing move from live facts;
+- provider observability, usage panel, and footer focused tests pass `41/41`, including `not_observed`, endpoint unavailable, invalid payload, stale quota, missing usage, and opt-in/default display; the installed config is the only profile with `observability_url`;
+- canonical `kimi` binary/config/TUI hashes remained `9f4337e1…`, `858fd6b5…`, and `c6b3b653…`; `kimi doctor` passes, provider listing contains only `managed:kimi-code`, and canonical config contains no `2234` or GPT-5.6 alias.
+
+### M17 — kiminn tmux pane identity (PASS)
 
 Intent:
 
@@ -490,7 +499,47 @@ Promotion criteria and RBV:
 - a real kiminn process launched outside tmux shows no empty placeholder or stale pane ID;
 - resize/re-render and session resume preserve the correct display, and the value is not written into model prompts, API headers, session history, or telemetry.
 
-Recovery boundary: revert the future M17 client/config commit and restore the prior isolated kiminn binary; no gateway or canonical Kimi rollback is required.
+Recovery boundary: revert client commit `9c06ba901`, restore `tui.toml` and the binary from `/Users/noelbao/.kiminn/backups/m16-m18-20260810-0811/`; no gateway or canonical Kimi rollback is required.
+
+Evidence:
+
+- the installed TUI read `TMUX_PANE=%216` directly and rendered exact `pane_id=%216` beside the provider facts; no subprocess lookup or active-pane inference is present;
+- two simultaneous panes rendered their own identities `%218` and `%219`; after resizing from `220x48` to `200x44`, both re-rendered with the same respective IDs while showing independent session account/cache facts;
+- a real TUI launched with `TMUX_PANE` absent omitted the pane slot entirely, with no empty placeholder; strict parsing also rejects malformed values;
+- exact session-record searches found none of `%216`, `%218`, `%219`, `pane_id=`, or `TMUX_PANE`, proving the UI-only identity was not persisted into prompts/history; focused tests cover opt-in, default-hidden, valid, absent, and malformed cases.
+
+### M18 — managed Kimi K3 max video fallback (PASS)
+
+Intent:
+
+- let a localhost-2234 kiminn session use `ReadMediaFile` on video even though Sol/Terra/Luna expose image input but no video input;
+- analyze only the video through borrowed canonical Coding Plan OAuth on `kimi-code/k3` at `max` effort, return text to the parent tool call, and keep the main agent on its selected 2234 model;
+- preserve normal image delivery through the active Responses model and leave canonical `kimi` unchanged.
+
+Design constraints:
+
+- gate the generic mechanism behind `video-media-fallback`, default off, and activate it only in `/Users/noelbao/.kiminn/config.toml`;
+- bind fallback model/effort as provider policy (`video_fallback_model`, `video_fallback_effort`) while keeping upload/request mechanics inside the media domain;
+- preserve the existing file-access approval boundary and forward the tool's actual `question`; do not send video bytes to localhost 2234 or switch/persist the parent model;
+- emit an inspectable tool-result note with the fallback model and effort, and fail visibly when upload or analysis fails.
+
+Promotion criteria and RBV:
+
+- a real valid MP4 is read from an installed kiminn session whose parent wire remains Sol/xhigh;
+- K3 receives the video and actual user question at max effort, returns a grounded result, and the parent completes from that tool result;
+- image input remains on the original path; no fallback is registered unless the feature flag and provider policy are present;
+- native build/smoke, focused media tests, typechecks, doctor, split-home storage, and canonical-isolation checks pass.
+
+Recovery boundary: revert commit `9b203e9f2`, restore `/Users/noelbao/.kiminn` from `/Users/noelbao/.kiminn/backups/m16-m18-20260810-0811/`, and leave the gateway/canonical installation untouched.
+
+Evidence:
+
+- a generated 1-second H.264 `320x240` solid-blue MP4 (SHA-256 `7b37dc93…`) was inspected with `ffprobe`, then removed after RBV;
+- installed session `session_c667bb2e-c2f6-4b82-b1c4-882e2c03021d` bound the parent to `local-openai-2234/gpt-5.6-sol` at `xhigh`, called `ReadMediaFile` with the exact question `What is the dominant color throughout this video?`, and recorded `<system>Video analyzed by fallback model kimi-code/k3 at max effort.</system>`;
+- K3 returned a grounded solid-blue description and the parent returned exact `VIDEO_FALLBACK_BLUE_OK`; the gateway observed only two Sol/xhigh Responses requests for the parent session, with no video request routed through 2234;
+- media contracts pass `54/54`, including question forwarding, upload, `thinkingEffort=max`, fallback result, image non-routing, feature flag/provider wiring, and no-capability registration; both agent-core typechecks and the v2 import-boundary check pass;
+- native SEA build, code-sign verification, smoke, `kiminn doctor`, config parse, and provider listing pass; installed binary/config/TUI hashes are `0553bcd4…`, `8576f4ea…`, and `09d7953c…`, and the wrapper remains `6729dac0…`;
+- `/Users/noelbao/.kiminn/install-receipt.toml` records exact source/gateway artifacts, feature policy, RBV sessions, hashes, split homes, and rollback path; the two temporary tmux sessions and MP4 were cleaned up.
 
 Local recovery:
 
