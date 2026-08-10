@@ -1,6 +1,6 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-10T08:17:24+08:00`
+- updated_at: `2026-08-10T08:22:00+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` provider observability, tmux identity, and managed-Kimi video fallback
 - current milestone: M18 — managed Kimi K3 video fallback
 - next milestones: none
@@ -537,7 +537,7 @@ Evidence:
 - a generated 1-second H.264 `320x240` solid-blue MP4 (SHA-256 `7b37dc93…`) was inspected with `ffprobe`, then removed after RBV;
 - installed session `session_c667bb2e-c2f6-4b82-b1c4-882e2c03021d` bound the parent to `local-openai-2234/gpt-5.6-sol` at `xhigh`, called `ReadMediaFile` with the exact question `What is the dominant color throughout this video?`, and recorded `<system>Video analyzed by fallback model kimi-code/k3 at max effort.</system>`;
 - K3 returned a grounded solid-blue description and the parent returned exact `VIDEO_FALLBACK_BLUE_OK`; the gateway observed only two Sol/xhigh Responses requests for the parent session, with no video request routed through 2234;
-- media contracts pass `54/54`, including question forwarding, upload, `thinkingEffort=max`, fallback result, image non-routing, feature flag/provider wiring, and no-capability registration; both agent-core typechecks and the v2 import-boundary check pass;
+- media contracts pass `54/54`, including question forwarding, upload, `thinkingEffort=max`, fallback result, image non-routing, feature flag/provider wiring, and no-capability registration; the added tool-schema field moved the full-compaction fixture baseline from `14,365` to the real `14,414`, after which the complete v2 suite passed `4,919/4,919`; both agent-core typechecks and the v2 import-boundary check pass;
 - native SEA build, code-sign verification, smoke, `kiminn doctor`, config parse, and provider listing pass; installed binary/config/TUI hashes are `0553bcd4…`, `8576f4ea…`, and `09d7953c…`, and the wrapper remains `6729dac0…`;
 - `/Users/noelbao/.kiminn/install-receipt.toml` records exact source/gateway artifacts, feature policy, RBV sessions, hashes, split homes, and rollback path; the two temporary tmux sessions and MP4 were cleaned up.
 
