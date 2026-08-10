@@ -56,6 +56,42 @@ describe('UsagePanelComponent', () => {
     expect(output).toContain('Not observed yet. Send a model request first.');
   });
 
+  it('shows unavailable and stale provider facts without treating them as fresh zeros', () => {
+    const unavailable = buildUsageReportLines({
+      sessionUsage: { byModel: {} },
+      contextUsage: 0,
+      contextTokens: 0,
+      maxContextTokens: 0,
+      providerObservability: {
+        kind: 'error',
+        provider: 'local-openai',
+        message: 'gateway unavailable',
+      },
+    })
+      .map(strip)
+      .join('\n');
+    expect(unavailable).toContain('gateway unavailable');
+    expect(unavailable).not.toContain('Cache hit 0.0%');
+
+    const stale = buildUsageReportLines({
+      sessionUsage: { byModel: {} },
+      contextUsage: 0,
+      contextTokens: 0,
+      maxContextTokens: 0,
+      providerObservability: {
+        kind: 'observed',
+        provider: 'local-openai',
+        accountLabel: 'codex-example',
+        quotaState: 'stale',
+        quotaAgeSeconds: 900,
+      },
+    })
+      .map(strip)
+      .join('\n');
+    expect(stale).toContain('stale · updated 15m ago');
+    expect(stale).toContain('Cache hit n/a');
+  });
+
   it('formats session, context, and managed usage sections', () => {
     // Freeze the clock so the resetAt fixture is an exact hour out — with a
     // live clock the elapsed milliseconds floor the diff down to 59m.

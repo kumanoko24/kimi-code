@@ -86,7 +86,9 @@ describe('provider observability (session selection and safe parsing)', () => {
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       'http://127.0.0.1:2234/dashboard/api/session',
-      expect.objectContaining({ headers: expect.objectContaining({ 'X-Pool-Session-ID': 'session-example' }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-Pool-Session-ID': 'session-example' }),
+      }),
     );
   });
 
@@ -110,5 +112,27 @@ describe('provider observability (session selection and safe parsing)', () => {
 
     await expect(fetchProviderObservability(withoutEndpoint, fetchImpl)).resolves.toBeUndefined();
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('reports an unavailable endpoint without inventing zero usage', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new Error('gateway unavailable'));
+
+    await expect(fetchProviderObservability(state, fetchImpl)).resolves.toEqual({
+      kind: 'error',
+      provider: 'local',
+      message: 'gateway unavailable',
+    });
+  });
+
+  it('rejects an observed response that omits safe account and quota facts', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ state: 'observed', session: {} }), { status: 200 }),
+    );
+
+    await expect(fetchProviderObservability(state, fetchImpl)).resolves.toEqual({
+      kind: 'error',
+      provider: 'local',
+      message: 'Invalid observability response.',
+    });
   });
 });
