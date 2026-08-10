@@ -109,11 +109,16 @@ api_key = "YOUR_API_KEY"
 
 如果网关通过请求 header 保持会话亲和性，可配置 `cache_key_header`。Kimi Code 会把同一个自动生成的会话值写入该 header 和 Responses API 的 `prompt_cache_key`，不会让所有会话共用一个静态值。
 
+兼容网关还可以通过 `observability_url` 提供安全的会话级账号、配额及缓存汇总数据。Kimi Code 会用相同的会话身份查询这个只读端点，并在 `/usage` 中显示结果；在 `[status_line].items` 中加入 `provider`，即可让账号标签和缓存命中率持续显示在底部状态栏。
+
+如果 Responses 模型支持图片但不支持视频，`ReadMediaFile` 可以把视频分析委派给另一个已配置模型，而不切换主会话模型。在 Responses 供应商上设置 `video_fallback_model` 和 `video_fallback_effort`，再开启 `video-media-fallback`。工具会把实际的视频问题转交给后备模型；图片读取仍由当前 Responses 模型处理。
+
 如需供应商原生压缩，请同时开启实验功能并让供应商显式 opt in。此后 `/compact` 和自动 full compaction 会调用 `POST /responses/compact`，把会话作为 `input`、当前系统提示词作为 `instructions`，并把选定的 Thinking effort 作为 `reasoning` 发送。压缩由该端点自行完成，不需要另外提供摘要提示词。Kimi Code 会把返回的 output 保存为不透明供应商状态，并在下一次 Responses 请求中原样重放。如果任一开关未启用，Kimi Code 会继续走现有的基于提示词的文本压缩路径。
 
 ```toml
 [experimental]
 openai-responses-compaction = true
+video-media-fallback = true
 
 [providers.responses-gateway]
 type = "openai_responses"
@@ -121,6 +126,9 @@ base_url = "https://gateway.example/v1"
 api_key = "YOUR_API_KEY"
 cache_key_header = "X-Session-ID"
 native_compaction = true
+observability_url = "https://gateway.example/observability/session"
+video_fallback_model = "video-provider/video-model"
+video_fallback_effort = "high"
 
 [models."responses-gateway/example-model"]
 provider = "responses-gateway"

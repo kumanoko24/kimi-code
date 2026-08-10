@@ -109,11 +109,16 @@ api_key = "YOUR_API_KEY"
 
 For a gateway that uses a request header for session affinity, configure `cache_key_header`. Kimi Code writes the same generated per-session value to that header and to the Responses API `prompt_cache_key`; it does not reuse one static value across sessions.
 
+A compatible gateway can also expose safe per-session account, quota, and cache aggregates through `observability_url`. Kimi Code queries that read-only endpoint with the same session identity and shows the result in `/usage`; add `provider` to `[status_line].items` to keep the account label and cache hit rate visible in the footer.
+
+When the Responses model accepts images but not video, `ReadMediaFile` can delegate video analysis to another configured model without switching the main session model. Set `video_fallback_model` and `video_fallback_effort` on the Responses provider, then enable `video-media-fallback`. The tool forwards its actual video question to the fallback model; image reads continue through the active Responses model.
+
 To use provider-native compaction, enable the experiment and opt the provider in. `/compact` and automatic full compaction then call `POST /responses/compact`, sending the conversation as `input`, the active system prompt as `instructions`, and the selected thinking effort as `reasoning`. The endpoint performs compaction itself; it does not require a separate summarization prompt. Kimi Code persists the returned output as opaque provider state and replays those items unchanged on the next Responses request. If either switch is off, Kimi Code uses its existing prompt-based text-compaction path.
 
 ```toml
 [experimental]
 openai-responses-compaction = true
+video-media-fallback = true
 
 [providers.responses-gateway]
 type = "openai_responses"
@@ -121,6 +126,9 @@ base_url = "https://gateway.example/v1"
 api_key = "YOUR_API_KEY"
 cache_key_header = "X-Session-ID"
 native_compaction = true
+observability_url = "https://gateway.example/observability/session"
+video_fallback_model = "video-provider/video-model"
+video_fallback_effort = "high"
 
 [models."responses-gateway/example-model"]
 provider = "responses-gateway"

@@ -133,6 +133,9 @@ Each entry in the `providers` table defines an API provider, keyed by a unique n
 | `custom_headers` | `table<string, string>` | No | Custom HTTP headers attached to each request |
 | `cache_key_header` | `string` | No | `openai_responses` only. HTTP header name that receives the same stable per-session cache key as `prompt_cache_key`; useful for gateways that route or cache by a header. Unlike `custom_headers`, the value is generated separately for each session |
 | `native_compaction` | `boolean` | No | `openai_responses` only. Advertise support for provider-native `POST /responses/compact`; also requires the `openai-responses-compaction` experimental flag |
+| `observability_url` | `string` | No | Read-only session-observability endpoint for a compatible gateway. Kimi Code sends the stable session ID in `X-Pool-Session-ID` and displays the returned safe account label, quota, and cache aggregates in `/usage` and the optional `provider` status-line slot |
+| `video_fallback_model` | `string` | No | Model alias used by `ReadMediaFile` to analyze video when the active model lacks `video_in`; also requires the `video-media-fallback` experimental flag |
+| `video_fallback_effort` | `string` | No | Thinking effort for `video_fallback_model`; defaults to `high` |
 
 **`env` sub-table**: You can write provider-conventional key names (such as `KIMI_API_KEY`) inside `[providers.<name>.env]` as a fallback source for `api_key` / `base_url`. This sub-table is **read only from the config file** and does not modify the shell environment:
 
@@ -362,6 +365,7 @@ Like the `tools` / `disallowedTools` fields of an agent file, this section shape
 | Field | Type | Default | Description |
 | --- | --- | --- | --- |
 | `openai-responses-compaction` | `boolean` | `false` | Allow an `openai_responses` provider with `native_compaction = true` to compact through `POST /responses/compact`. Otherwise, Kimi Code keeps using its text-compaction path |
+| `video-media-fallback` | `boolean` | `false` | Allow `ReadMediaFile` to analyze video through the active provider's `video_fallback_model` while leaving the main session model unchanged |
 
 ## `services`
 
@@ -434,7 +438,7 @@ Alongside `config.toml`, the CLI keeps terminal-UI and client preferences in a c
 | `[notifications].enabled` | `boolean` | `true` | Whether desktop notifications are sent |
 | `[notifications].notification_condition` | `string` | `unfocused` | When to notify: `unfocused` (only when the terminal is not focused) or `always` |
 | `[upgrade].auto_install` | `boolean` | `true` | Whether new versions are installed automatically |
-| `[status_line].items` | `string[]` | `[]` | Built-in slots to show on the first footer line and their order: `mode`, `goal`, `model`, `tasks`, `cwd`, `git`, `tips`. Unset keeps the default layout; unknown ids are skipped with a warning |
+| `[status_line].items` | `string[]` | `[]` | Built-in slots to show on the first footer line and their order: `mode`, `goal`, `model`, `tasks`, `provider`, `pane`, `cwd`, `git`, `tips`. `provider` shows configured gateway account/cache aggregates; `pane` shows `pane_id=%nn` when `TMUX_PANE` is valid. Unset keeps the default layout; unknown ids are skipped with a warning |
 | `[status_line].command` | `string` | `""` | Custom status line command. Its first stdout line replaces the first footer line, with a JSON snapshot (model, cwd, git branch, permission mode, plan mode, context usage, session id, version) passed on stdin. Runs are capped at 300ms and throttled to once per second; failures fall back to the built-in layout |
 
 ```toml
@@ -454,7 +458,7 @@ notification_condition = "unfocused" # "unfocused" | "always"
 auto_install = true
 
 # [status_line]
-# items = ["mode", "goal", "model", "tasks", "cwd", "git", "tips"]
+# items = ["mode", "goal", "model", "tasks", "provider", "pane", "cwd", "git", "tips"]
 # command = "~/.kimi-code/statusline.sh"
 ```
 

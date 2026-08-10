@@ -133,6 +133,9 @@ timeout = 5
 | `custom_headers` | `table<string, string>` | 否 | 每次请求附加的自定义 HTTP 头 |
 | `cache_key_header` | `string` | 否 | 仅 `openai_responses`。把与 `prompt_cache_key` 相同的稳定会话缓存键写入指定 HTTP 头，适用于按 header 路由或缓存的网关。与 `custom_headers` 不同，每个会话都会生成独立的值 |
 | `native_compaction` | `boolean` | 否 | 仅 `openai_responses`。声明供应商支持原生 `POST /responses/compact`；还需开启 `openai-responses-compaction` 实验功能 |
+| `observability_url` | `string` | 否 | 兼容网关提供的只读会话可观测端点。Kimi Code 会通过 `X-Pool-Session-ID` 发送稳定会话 ID，并在 `/usage` 和可选的 `provider` 状态栏槽位中显示返回的安全账号标签、配额及缓存汇总数据 |
+| `video_fallback_model` | `string` | 否 | 当前模型不具备 `video_in` 时，`ReadMediaFile` 用于分析视频的模型别名；还需开启 `video-media-fallback` 实验功能 |
+| `video_fallback_effort` | `string` | 否 | `video_fallback_model` 使用的 Thinking effort；默认值为 `high` |
 
 **`env` 子表**：可以把供应商惯用的键名（如 `KIMI_API_KEY`）写在 `[providers.<name>.env]` 里，作为 `api_key` / `base_url` 的备用来源。这个子表**只在配置文件里读取**，不会修改 shell 环境：
 
@@ -362,6 +365,7 @@ disabled = ["EnterPlanMode", "ExitPlanMode", "mcp__github__*"]
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `openai-responses-compaction` | `boolean` | `false` | 允许配置了 `native_compaction = true` 的 `openai_responses` 供应商通过 `POST /responses/compact` 压缩上下文；否则 Kimi Code 继续使用文本压缩路径 |
+| `video-media-fallback` | `boolean` | `false` | 允许 `ReadMediaFile` 通过当前供应商的 `video_fallback_model` 分析视频，同时保持主会话模型不变 |
 
 ## `services`
 
@@ -434,7 +438,7 @@ MCP server 的声明配置写在 `~/.kimi-code/mcp.json` 或项目内 `.kimi-cod
 | `[notifications].enabled` | `boolean` | `true` | 是否发送桌面通知 |
 | `[notifications].notification_condition` | `string` | `unfocused` | 何时通知：`unfocused`（仅终端失去焦点时）或 `always`（总是） |
 | `[upgrade].auto_install` | `boolean` | `true` | 是否自动安装新版本 |
-| `[status_line].items` | `string[]` | `[]` | 底部状态栏第一行展示哪些内置槽位及其顺序：`mode`、`goal`、`model`、`tasks`、`cwd`、`git`、`tips`。缺省保持默认布局；未知 id 跳过并告警 |
+| `[status_line].items` | `string[]` | `[]` | 底部状态栏第一行展示哪些内置槽位及其顺序：`mode`、`goal`、`model`、`tasks`、`provider`、`pane`、`cwd`、`git`、`tips`。`provider` 显示已配置网关的账号与缓存汇总数据；`pane` 在 `TMUX_PANE` 有效时显示 `pane_id=%nn`。缺省保持默认布局；未知 id 跳过并告警 |
 | `[status_line].command` | `string` | `""` | 自定义状态栏命令。其 stdout 第一行替换状态栏第一行，stdin 会收到 JSON 快照（model、cwd、git 分支、permission 模式、plan 模式、上下文用量、session id、版本）。运行上限 300ms、每秒最多一次；失败时回退内置布局 |
 
 ```toml
@@ -454,7 +458,7 @@ notification_condition = "unfocused" # "unfocused" | "always"
 auto_install = true
 
 # [status_line]
-# items = ["mode", "goal", "model", "tasks", "cwd", "git", "tips"]
+# items = ["mode", "goal", "model", "tasks", "provider", "pane", "cwd", "git", "tips"]
 # command = "~/.kimi-code/statusline.sh"
 ```
 
