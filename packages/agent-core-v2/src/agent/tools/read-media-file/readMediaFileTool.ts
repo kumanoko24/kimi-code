@@ -97,12 +97,14 @@ import {
   MAX_MEDIA_MEGABYTES,
   ReadMediaFileInputSchema,
   type ReadMediaFileInput,
+  type VideoAnalyzer,
   type VideoUploader,
 } from './read-media-file';
 import readMediaDescriptionHead from './read-media.md?raw';
 
+const DEFAULT_VIDEO_QUESTION = 'Describe this video accurately and comprehensively.';
 
-function buildDescription(capabilities: ModelCapability): string {
+function buildDescription(capabilities: ModelCapability, hasVideoFallback: boolean): string {
   const head = renderPrompt(readMediaDescriptionHead, { MAX_MEDIA_MEGABYTES });
   const lines: string[] = [head];
   const hasImage = capabilities.image_in;
@@ -112,11 +114,18 @@ function buildDescription(capabilities: ModelCapability): string {
   } else if (hasImage) {
     lines.push(
       '- This tool supports image files for the current model.',
-      '- Video files are not supported by the current model.',
+      hasVideoFallback
+        ? '- Video files are analyzed by the configured fallback model; include the user intent in question.'
+        : '- Video files are not supported by the current model.',
     );
   } else if (hasVideo) {
     lines.push(
       '- This tool supports video files for the current model.',
+      '- Image files are not supported by the current model.',
+    );
+  } else if (hasVideoFallback) {
+    lines.push(
+      '- Video files are analyzed by the configured fallback model; include the user intent in question.',
       '- Image files are not supported by the current model.',
     );
   } else {
@@ -243,8 +252,9 @@ export class ReadMediaFileTool implements AgentTool<ReadMediaFileInput> {
     private readonly videoUploader?: VideoUploader,
     telemetry?: ITelemetryService,
     inlineVideoSupported?: boolean,
+    private readonly videoAnalyzer?: VideoAnalyzer,
   ) {
-    this.description = buildDescription(capabilities);
+    this.description = buildDescription(capabilities, videoAnalyzer !== undefined);
     this.compressTelemetry =
       telemetry === undefined ? undefined : { client: telemetry, source: 'read_media' };
     this.inlineVideoSupported = inlineVideoSupported ?? false;
@@ -289,13 +299,14 @@ export class ReadMediaFileTool implements AgentTool<ReadMediaFileInput> {
           pathClass: this.env.pathClass,
           homeDir: this.env.homeDir,
         }),
-      execute: () => this.execution(args, path),
+      execute: (ctx) => this.execution(args, path, ctx.signal),
     };
   }
 
   private async execution(
     args: ReadMediaFileInput,
     safePath: string,
+    signal?: AbortSignal,
   ): Promise<ExecutableToolResult> {
     if (!args.path) {
       return { isError: true, output: 'File path cannot be empty.' };
@@ -334,7 +345,11 @@ export class ReadMediaFileTool implements AgentTool<ReadMediaFileInput> {
           output: buildImageConversionGuidance(args.path, fileType.mimeType, this.env.osKind),
         };
       }
-      if (fileType.kind === 'video' && !this.capabilities.video_in) {
+      if (
+        fileType.kind === 'video' &&
+        !this.capabilities.video_in &&
+        this.videoAnalyzer === undefined
+      ) {
         return {
           isError: true,
           output:
@@ -407,6 +422,19 @@ export class ReadMediaFileTool implements AgentTool<ReadMediaFileInput> {
       }
 
       const data = Buffer.from(await this.fs.readBytes(safePath));
+      if (fileType.kind === 'video' && !this.capabilities.video_in) {
+        const analysis = await this.videoAnalyzer!({
+          data,
+          mimeType: fileType.mimeType,
+          filename: safePath.split(/[\\/]/).at(-1),
+          question: args.question ?? DEFAULT_VIDEO_QUESTION,
+          signal,
+        });
+        return {
+          output: analysis.text,
+          note: `<system>Video analyzed by fallback model ${analysis.model} at ${analysis.effort} effort.</system>`,
+        };
+      }
       let dimensions = fileType.kind === 'image' ? sniffImageDimensions(data) : null;
       let mediaPart: ContentPart;
       let delivery: ImageDelivery | undefined;

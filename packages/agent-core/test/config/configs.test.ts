@@ -161,6 +161,8 @@ base_url = "https://api.example.test/v1"
 cache_key_header = "X-Session-ID"
 native_compaction = true
 observability_url = "http://127.0.0.1:2234/dashboard/api/session"
+video_fallback_model = "kimi-code/k3"
+video_fallback_effort = "max"
 `,
       'config.toml',
     );
@@ -170,6 +172,8 @@ observability_url = "http://127.0.0.1:2234/dashboard/api/session"
       cacheKeyHeader: 'X-Session-ID',
       nativeCompaction: true,
       observabilityUrl: 'http://127.0.0.1:2234/dashboard/api/session',
+      videoFallbackModel: 'kimi-code/k3',
+      videoFallbackEffort: 'max',
     });
     expect(() =>
       parseConfigString(

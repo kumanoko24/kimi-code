@@ -38,6 +38,8 @@ export interface ProviderConfig {
   cacheKeyHeader?: string;
   nativeCompaction?: boolean;
   observabilityUrl?: string;
+  videoFallbackModel?: string;
+  videoFallbackEffort?: string;
   defaultModel?: string;
 
   type?: ProviderType;

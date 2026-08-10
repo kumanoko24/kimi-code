@@ -8,7 +8,7 @@
  */
 
 import type { ModelCapability } from '#/kosong/contract/capability';
-import type { ContentPart } from '#/kosong/contract/message';
+import type { ContentPart, Message } from '#/kosong/contract/message';
 import { VideoUploadUnsupportedError } from '#/kosong/contract/errors';
 import { Jimp } from 'jimp';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +19,7 @@ import type { ITelemetryService, TelemetryProperties } from '#/app/telemetry/tel
 import {
   ReadMediaFileInputSchema,
   type ReadMediaFileInput,
+  type VideoAnalyzer,
   type VideoUploader,
 } from '#/agent/tools/read-media-file/read-media-file';
 import { ReadMediaFileTool } from '#/agent/tools/read-media-file/readMediaFileTool';
@@ -26,7 +27,11 @@ import {
   MAX_IMAGE_DECODE_BYTES,
   setConfiguredReadImageByteBudget,
 } from '#/agent/media/image-compress';
-import { createVideoUploader, registerMediaTools } from '#/agent/media/registerMediaTools';
+import {
+  createVideoAnalyzer,
+  createVideoUploader,
+  registerMediaTools,
+} from '#/agent/media/registerMediaTools';
 import { AgentMediaToolsRegistrar } from '#/agent/media/mediaToolsRegistrar';
 import { AgentStateService } from '#/agent/state/agentStateService';
 import { AgentToolRegistryService } from '#/agent/toolRegistry/toolRegistryService';
@@ -40,6 +45,8 @@ import { EventBusService } from '#/app/event/eventBusService';
 import type { IAgentProfileService } from '#/agent/profile/profile';
 import type { IModelCatalog } from '#/kosong/model/catalog';
 import type { ModelRequester } from '#/kosong/model/modelRequester';
+import type { IProviderService } from '#/kosong/provider/provider';
+import type { IFlagService } from '#/app/flag/flag';
 import type { ISessionWorkspaceContext } from '#/session/workspaceContext/workspaceContext';
 import type { WorkspaceConfig } from '#/tool/path-access';
 import { sniffImageDimensions } from '#/agent/media/file-type';
@@ -175,6 +182,7 @@ function makeTool(
   videoUploader?: VideoUploader,
   telemetry?: ITelemetryService,
   inlineVideoSupported?: boolean,
+  videoAnalyzer?: VideoAnalyzer,
 ): ReadMediaFileTool {
   return new ReadMediaFileTool(
     createTestFs(files),
@@ -184,6 +192,7 @@ function makeTool(
     videoUploader,
     telemetry,
     inlineVideoSupported,
+    videoAnalyzer,
   );
 }
 
@@ -270,6 +279,64 @@ describe('ReadMediaFileTool', () => {
     expect(makeTool({}, capabilities({ image_in: false, video_in: false })).description).toContain(
       'does not support image or video input',
     );
+    expect(
+      makeTool(
+        {},
+        capabilities({ image_in: false, video_in: false }),
+        undefined,
+        undefined,
+        undefined,
+        vi.fn<VideoAnalyzer>(),
+      ).description,
+    ).toContain('configured fallback model');
+  });
+
+  it('uses the configured analyzer when the current model lacks video input', async () => {
+    const analyzer = vi.fn<VideoAnalyzer>().mockResolvedValue({
+      text: 'The clip shows a blue square.',
+      model: 'kimi-code/k3',
+      effort: 'max',
+    });
+    const result = await execute(
+      makeTool(
+        { '/workspace/clip.mp4': { data: mp4Buffer() } },
+        capabilities({ image_in: true, video_in: false }),
+        undefined,
+        undefined,
+        undefined,
+        analyzer,
+      ),
+      { path: '/workspace/clip.mp4', question: 'What color is the square?' },
+    );
+
+    expect(result.output).toBe('The clip shows a blue square.');
+    expect(result.note).toContain('kimi-code/k3 at max effort');
+    expect(analyzer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mimeType: 'video/mp4',
+        filename: 'clip.mp4',
+        question: 'What color is the square?',
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it('does not route images through the video analyzer', async () => {
+    const analyzer = vi.fn<VideoAnalyzer>();
+    const result = await execute(
+      makeTool(
+        { '/workspace/sample.png': { data: pngBuffer() } },
+        capabilities({ image_in: true, video_in: false }),
+        undefined,
+        undefined,
+        undefined,
+        analyzer,
+      ),
+      { path: '/workspace/sample.png' },
+    );
+
+    expect(result.isError).not.toBe(true);
+    expect(analyzer).not.toHaveBeenCalled();
   });
 
   it('rejects empty paths', async () => {
@@ -816,6 +883,18 @@ describe('registerMediaTools', () => {
     expect(registry.resolve('ReadMediaFile')).toBeUndefined();
     expect(() => disposable.dispose()).not.toThrow();
   });
+
+  it('registers ReadMediaFile when only a video fallback is available', () => {
+    const registry = new AgentToolRegistryService();
+    registerMediaTools(registry, {
+      fs,
+      env,
+      workspace: WORKSPACE,
+      capabilities: capabilities({ image_in: false, video_in: false }),
+      videoAnalyzer: vi.fn<VideoAnalyzer>(),
+    });
+    expect(registry.resolve('ReadMediaFile')).toBeInstanceOf(ReadMediaFileTool);
+  });
 });
 
 describe('AgentMediaToolsRegistrar', () => {
@@ -824,7 +903,7 @@ describe('AgentMediaToolsRegistrar', () => {
     capabilities: ModelCapability;
   }
 
-  function createRegistrarHarness() {
+  function createRegistrarHarness(options: { readonly videoFallback?: boolean } = {}) {
     const registry = new AgentToolRegistryService();
     const eventBus = new EventBusService();
     const state: ProfileState = {
@@ -837,7 +916,14 @@ describe('AgentMediaToolsRegistrar', () => {
     } as unknown as IAgentProfileService;
     const modelCatalog = {
       getRequester: (id: string) => ({
-        model: { id, name: id, providerName: 'test', protocol: 'openai' },
+        model: {
+          id,
+          name: id,
+          providerName: id === 'kimi-code/k3' ? 'kimi-code' : 'test',
+          protocol: id === 'kimi-code/k3' ? 'kimi' : 'openai',
+        },
+        uploadVideo: id === 'kimi-code/k3' ? vi.fn() : undefined,
+        request: vi.fn(),
       }),
     } as unknown as IModelCatalog;
     const workspaceCtx = {
@@ -848,6 +934,14 @@ describe('AgentMediaToolsRegistrar', () => {
       registry,
       profile,
       modelCatalog,
+      {
+        get: () =>
+          options.videoFallback
+            ? { videoFallbackModel: 'kimi-code/k3', videoFallbackEffort: 'max' }
+            : undefined,
+        onDidChangeProviders: () => ({ dispose: () => {} }),
+      } as unknown as IProviderService,
+      { enabled: () => options.videoFallback === true } as unknown as IFlagService,
       eventBus,
       createTestFs({}),
       createTestEnv(),
@@ -875,6 +969,20 @@ describe('AgentMediaToolsRegistrar', () => {
     const tool = registry.resolve('ReadMediaFile');
     expect(tool).toBeInstanceOf(ReadMediaFileTool);
     expect((tool as ReadMediaFileTool).description).toContain('Video files are not supported');
+  });
+
+  it('wires the provider-configured fallback only when its experimental flag is enabled', () => {
+    const disabled = createRegistrarHarness();
+    disabled.bindModel('vision-model', capabilities({ image_in: true, video_in: false }));
+    expect((disabled.registry.resolve('ReadMediaFile') as ReadMediaFileTool).description).toContain(
+      'Video files are not supported',
+    );
+
+    const enabled = createRegistrarHarness({ videoFallback: true });
+    enabled.bindModel('vision-model', capabilities({ image_in: true, video_in: false }));
+    expect((enabled.registry.resolve('ReadMediaFile') as ReadMediaFileTool).description).toContain(
+      'configured fallback model',
+    );
   });
 
   it('drops the tool when the model loses media input', () => {
@@ -915,6 +1023,74 @@ describe('AgentMediaToolsRegistrar', () => {
     expect(registry.resolve('ReadMediaFile')).toBeUndefined();
     bindModel('vision-model-2', capabilities({ image_in: true, video_in: true }));
     expect(registry.resolve('ReadMediaFile')).toBeUndefined();
+  });
+});
+
+describe('createVideoAnalyzer', () => {
+  it('uploads the video and asks the fallback model with the configured effort', async () => {
+    const uploaded = {
+      type: 'video_url' as const,
+      videoUrl: { url: 'https://example.com/fallback-video.mp4' },
+    };
+    const uploadVideo = vi.fn().mockResolvedValue(uploaded);
+    const request = vi.fn(async function* () {
+      const message: Message = {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'A blue square moves from left to right.' }],
+        toolCalls: [],
+      };
+      yield { type: 'finish' as const, message };
+    });
+    const requester = {
+      model: {
+        id: 'kimi-k3',
+        name: 'Kimi K3',
+        providerName: 'kimi-code',
+        protocol: 'kimi',
+      },
+      uploadVideo,
+      request,
+    } as unknown as ModelRequester;
+    const analyzer = createVideoAnalyzer(requester, 'kimi-code/k3', 'max');
+    const signal = new AbortController().signal;
+
+    await expect(
+      analyzer!({
+        data: mp4Buffer(),
+        mimeType: 'video/mp4',
+        filename: 'clip.mp4',
+        question: 'How does the blue square move?',
+        signal,
+      }),
+    ).resolves.toEqual({
+      text: 'A blue square moves from left to right.',
+      model: 'kimi-code/k3',
+      effort: 'max',
+    });
+    expect(uploadVideo).toHaveBeenCalledWith(
+      expect.objectContaining({ mimeType: 'video/mp4', filename: 'clip.mp4' }),
+      { signal },
+    );
+    expect(request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: [],
+        messages: [
+          expect.objectContaining({
+            role: 'user',
+            content: [{ type: 'text', text: 'How does the blue square move?' }, uploaded],
+          }),
+        ],
+      }),
+      signal,
+      { thinkingEffort: 'max' },
+    );
+  });
+
+  it('returns undefined when the fallback requester cannot upload video', () => {
+    expect(createVideoAnalyzer(undefined, 'kimi-code/k3', 'max')).toBeUndefined();
+    expect(
+      createVideoAnalyzer({ request: vi.fn() } as unknown as ModelRequester, 'kimi-code/k3', 'max'),
+    ).toBeUndefined();
   });
 });
 

@@ -38,6 +38,8 @@ export const ProviderConfigSchema = z.object({
   cacheKeyHeader: HttpHeaderNameSchema.optional(),
   nativeCompaction: z.boolean().optional(),
   observabilityUrl: z.string().optional(),
+  videoFallbackModel: z.string().optional(),
+  videoFallbackEffort: z.string().optional(),
   source: z.record(z.string(), z.unknown()).optional(),
 });
 

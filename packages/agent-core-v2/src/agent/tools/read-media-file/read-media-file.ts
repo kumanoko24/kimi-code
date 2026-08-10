@@ -23,6 +23,19 @@ export type VideoUploader = (
   options?: { readonly signal?: AbortSignal },
 ) => Promise<VideoURLPart>;
 
+export interface VideoAnalysisInput extends VideoUploadInput {
+  readonly question: string;
+  readonly signal?: AbortSignal;
+}
+
+export interface VideoAnalysisResult {
+  readonly text: string;
+  readonly model: string;
+  readonly effort: string;
+}
+
+export type VideoAnalyzer = (input: VideoAnalysisInput) => Promise<VideoAnalysisResult>;
+
 
 export const ReadMediaFileInputSchema = z.object({
   path: z
@@ -52,6 +65,14 @@ export const ReadMediaFileInputSchema = z.object({
       'Images only: skip the default downscaling and view at native resolution. Fails with an ' +
         'explicit error when the payload would exceed the per-image byte limit; use region for ' +
         'files that large.',
+    ),
+  question: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'For video files, the question to answer about the video. Include the user\'s actual intent; ' +
+        'when omitted, the video is described generally.',
     ),
 });
 

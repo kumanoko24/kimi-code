@@ -11,6 +11,7 @@
  */
 
 import type { ModelCapability } from '#/kosong/contract/capability';
+import { extractText, type Message } from '#/kosong/contract/message';
 import type { ModelRequester } from '#/kosong/model/modelRequester';
 import type { VideoUploadEvent } from '#/app/telemetry/events';
 import type { ITelemetryService } from '#/app/telemetry/telemetry';
@@ -21,7 +22,13 @@ import type { IHostFileSystem } from '#/os/interface/hostFileSystem';
 import type { IHostEnvironment } from '#/os/interface/hostEnvironment';
 import type { IAgentToolRegistryService } from '#/agent/toolRegistry/toolRegistry';
 import { ReadMediaFileTool } from '#/agent/tools/read-media-file/readMediaFileTool';
-import type { VideoUploader } from '#/agent/tools/read-media-file/read-media-file';
+import type {
+  VideoAnalyzer,
+  VideoUploader,
+} from '#/agent/tools/read-media-file/read-media-file';
+
+const VIDEO_FALLBACK_SYSTEM_PROMPT =
+  'Answer the user question from the attached video. Be precise and do not invent unseen details.';
 
 export interface RegisterMediaToolsDeps {
   readonly fs: IHostFileSystem;
@@ -31,13 +38,18 @@ export interface RegisterMediaToolsDeps {
   readonly videoUploader?: VideoUploader;
   readonly telemetry?: ITelemetryService;
   readonly inlineVideoSupported?: boolean;
+  readonly videoAnalyzer?: VideoAnalyzer;
 }
 
 export function registerMediaTools(
   toolRegistry: IAgentToolRegistryService,
   deps: RegisterMediaToolsDeps,
 ): IDisposable {
-  if (!deps.capabilities.image_in && !deps.capabilities.video_in) {
+  if (
+    !deps.capabilities.image_in &&
+    !deps.capabilities.video_in &&
+    deps.videoAnalyzer === undefined
+  ) {
     return toDisposable(() => {});
   }
   return toolRegistry.register(
@@ -49,8 +61,47 @@ export function registerMediaTools(
       deps.videoUploader,
       deps.telemetry,
       deps.inlineVideoSupported,
+      deps.videoAnalyzer,
     ),
   );
+}
+
+export function createVideoAnalyzer(
+  requester: ModelRequester | undefined,
+  model: string,
+  effort: string,
+): VideoAnalyzer | undefined {
+  if (requester?.uploadVideo === undefined) return undefined;
+  const uploadVideo = requester.uploadVideo.bind(requester);
+  return async (input) => {
+    const video = await uploadVideo(
+      {
+        data: input.data,
+        mimeType: input.mimeType,
+        filename: input.filename,
+      },
+      { signal: input.signal },
+    );
+    const message: Message = {
+      role: 'user',
+      content: [{ type: 'text', text: input.question }, video],
+      toolCalls: [],
+    };
+    let answer = '';
+    for await (const event of requester.request(
+      {
+        systemPrompt: VIDEO_FALLBACK_SYSTEM_PROMPT,
+        tools: [],
+        messages: [message],
+      },
+      input.signal,
+      { thinkingEffort: effort },
+    )) {
+      if (event.type === 'finish') answer = extractText(event.message, '\n').trim();
+    }
+    if (answer.length === 0) throw new Error('Video fallback model returned no text.');
+    return { text: answer, model, effort };
+  };
 }
 
 export function createVideoUploader(

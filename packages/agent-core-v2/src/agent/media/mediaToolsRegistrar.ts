@@ -34,8 +34,10 @@ import { defineState } from '#/_base/state/stateRegistry';
 import { IAgentStateService } from '#/agent/state/agentState';
 import { IEventBus } from '#/app/event/eventBus';
 import { ITelemetryService } from '#/app/telemetry/telemetry';
+import { IFlagService } from '#/app/flag/flag';
 import { IModelCatalog, type Model } from '#/kosong/model/catalog';
 import { type ModelRequester } from '#/kosong/model/modelRequester';
+import { IProviderService } from '#/kosong/provider/provider';
 import { IHostEnvironment } from '#/os/interface/hostEnvironment';
 import { IHostFileSystem } from '#/os/interface/hostFileSystem';
 import { ISessionSkillCatalog } from '#/session/sessionSkillCatalog/skillCatalog';
@@ -45,7 +47,12 @@ import { IAgentToolRegistryService } from '#/agent/toolRegistry/toolRegistry';
 import { extendWorkspaceWithSkillRoots } from '#/tool/path-access';
 
 import { IAgentMediaToolsRegistrar } from './mediaTools';
-import { createVideoUploader, registerMediaTools } from './registerMediaTools';
+import { VIDEO_MEDIA_FALLBACK_FLAG_ID } from './flag';
+import {
+  createVideoAnalyzer,
+  createVideoUploader,
+  registerMediaTools,
+} from './registerMediaTools';
 
 export const mediaRegisteredKeyKey = defineState<string | undefined>(
   'media.registeredKey',
@@ -61,6 +68,8 @@ export class AgentMediaToolsRegistrar extends Service implements IAgentMediaTool
     @IAgentToolRegistryService private readonly toolRegistry: IAgentToolRegistryService,
     @IAgentProfileService private readonly profile: IAgentProfileService,
     @IModelCatalog private readonly modelCatalog: IModelCatalog,
+    @IProviderService private readonly providerService: IProviderService,
+    @IFlagService private readonly flags: IFlagService,
     @IEventBus eventBus: IEventBus,
     @IHostFileSystem private readonly fs: IHostFileSystem,
     @IHostEnvironment private readonly env: IHostEnvironment,
@@ -72,7 +81,16 @@ export class AgentMediaToolsRegistrar extends Service implements IAgentMediaTool
     super();
     this.states.register(mediaRegisteredKeyKey);
     this.refresh();
-    this._register(eventBus.subscribe('agent.status.updated', () => this.refresh()));
+    this._register(
+      eventBus.subscribe('agent.status.updated', () => {
+        this.refresh();
+      }),
+    );
+    this._register(
+      providerService.onDidChangeProviders(() => {
+        this.refresh();
+      }),
+    );
     this._register(toDisposable(() => this.registration?.dispose()));
   }
 
@@ -86,10 +104,13 @@ export class AgentMediaToolsRegistrar extends Service implements IAgentMediaTool
 
   private refresh(): void {
     const capabilities = this.profile.getModelCapabilities();
+    const fallback = this.fallbackConfig();
     const key = [
       this.profile.getModel(),
       String(capabilities.image_in),
       String(capabilities.video_in),
+      fallback?.model ?? '',
+      fallback?.effort ?? '',
     ].join('|');
     if (key === this.registeredKey) return;
     this.registeredKey = key;
@@ -104,6 +125,9 @@ export class AgentMediaToolsRegistrar extends Service implements IAgentMediaTool
       requester = this.modelCatalog.getRequester(modelAlias);
       model = requester.model;
     }
+    const fallbackRequester = fallback === undefined
+      ? undefined
+      : this.modelCatalog.getRequester(fallback.model);
     this.registration = registerMediaTools(this.toolRegistry, {
       fs: this.fs,
       env: this.env,
@@ -129,8 +153,23 @@ export class AgentMediaToolsRegistrar extends Service implements IAgentMediaTool
         },
       }),
       inlineVideoSupported: model?.protocol !== 'openai' && model?.protocol !== 'openai_responses',
+      videoAnalyzer:
+        fallback === undefined
+          ? undefined
+          : createVideoAnalyzer(fallbackRequester, fallback.model, fallback.effort),
       telemetry: this.telemetry,
     });
+  }
+
+  private fallbackConfig(): { readonly model: string; readonly effort: string } | undefined {
+    if (!this.flags.enabled(VIDEO_MEDIA_FALLBACK_FLAG_ID)) return undefined;
+    const modelAlias = this.profile.getModel();
+    if (modelAlias === '') return undefined;
+    const model = this.modelCatalog.getRequester(modelAlias).model;
+    const provider = this.providerService.get(model.providerName);
+    const fallbackModel = provider?.videoFallbackModel;
+    if (fallbackModel === undefined || fallbackModel.length === 0) return undefined;
+    return { model: fallbackModel, effort: provider?.videoFallbackEffort ?? 'high' };
   }
 }
 
