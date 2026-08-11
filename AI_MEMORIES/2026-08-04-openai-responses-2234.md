@@ -1,19 +1,19 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-10T08:22:00+08:00`
+- updated_at: `2026-08-12T02:10:48+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` provider observability, tmux identity, and managed-Kimi video fallback
-- current milestone: M18 — managed Kimi K3 video fallback
+- current milestone: M19 — upstream sync and isolated kiminn deployment
 - next milestones: none
-- status: PASS (`M1` through `M18` independently PASS)
+- status: PASS (`M1` through `M19` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
 - gateway commits: `4075d67`, `d45deb0`, `b383c5c`
-- live rollback boundary: restore isolated files from `/Users/noelbao/.kiminn/backups/m16-m18-20260810-0811/` and roll gateway artifact `09b8dbd1ceb537acb27c3e875474017b851a0ced489d92a86457e6a171c7eab5.whl` back to `f395b5ccc08399b99f04c1aafed68da6385588ef6a4b5fea6c952eaa34b0be2c.whl`
+- live rollback boundary: restore isolated files from `/Users/noelbao/.kiminn/backups/cumi-619564dcf-20260812-0208/` and roll gateway artifact `09b8dbd1ceb537acb27c3e875474017b851a0ced489d92a86457e6a171c7eab5.whl` back to `f395b5ccc08399b99f04c1aafed68da6385588ef6a4b5fea6c952eaa34b0be2c.whl`
 
 ## Invariants
 
-- Keep the Kimi-side input cap configurable and set the live profile to `258000`; do not silently clamp gateway requests.
+- Keep the Kimi-side context cap configurable and set the isolated live profile to `272000`; do not silently clamp gateway requests.
 - Preserve one stable session identity in both `prompt_cache_key` and an opt-in request header; never configure one static header for every session.
 - Preserve OpenAI compaction output as opaque provider state and send it back unchanged on the next Responses request.
 - Never print or mutate source credentials. Keep port 2234 loopback-only and retain the previous release for rollback.
@@ -540,6 +540,32 @@ Evidence:
 - media contracts pass `54/54`, including question forwarding, upload, `thinkingEffort=max`, fallback result, image non-routing, feature flag/provider wiring, and no-capability registration; the added tool-schema field moved the full-compaction fixture baseline from `14,365` to the real `14,414`, after which the complete v2 suite passed `4,919/4,919`; both agent-core typechecks and the v2 import-boundary check pass;
 - native SEA build, code-sign verification, smoke, `kiminn doctor`, config parse, and provider listing pass; installed binary/config/TUI hashes are `0553bcd4…`, `8576f4ea…`, and `09d7953c…`, and the wrapper remains `6729dac0…`;
 - `/Users/noelbao/.kiminn/install-receipt.toml` records exact source/gateway artifacts, feature policy, RBV sessions, hashes, split homes, and rollback path; the two temporary tmux sessions and MP4 were cleaned up.
+
+### M19 — upstream sync and isolated kiminn deployment (PASS)
+
+Intent:
+
+- merge the current `MoonshotAI/kimi-code` mainline into the OpenAI Responses fork without mutating upstream;
+- retain the fork's OAuth, session-index, Responses, observability, and isolated-home behavior while integrating the upstream Agent Core v2, TUI, kap-server, and Windows fixes;
+- rebuild and install only `kiminn`, preserving the canonical `kimi` binary and configuration.
+
+Success criteria and RBV:
+
+- the merge records both the fork tip and upstream commit `619564dcf` as parents, and typechecks / focused contract suites pass;
+- the installed native SEA is signed, passes native smoke and `doctor`, and its receipt names the exact source, binary hash, config hash, agent hash, and rollback directory;
+- a real request through the installed wrapper reaches localhost 2234 with Sol/xhigh and the configured `272000` context cap, returns the exact requested marker, and appears in the gateway's session/account telemetry;
+- canonical `~/.kimi-code` remains distinct and untouched by this install.
+
+Recovery boundary: restore `/Users/noelbao/.kiminn/bin/kimi`, `config.toml`, `tui.toml`, `install-receipt.toml`, and the wrapper from `/Users/noelbao/.kiminn/backups/cumi-619564dcf-20260812-0208/`; no canonical Kimi or gateway rollback is required.
+
+Evidence:
+
+- upstream moved from `01c74e937` to `619564dcf`; merge commit `3c43bb7451e6b4586ee0472f75f086371eb2325e` has fork parent `364ba556b` and upstream parent `619564dcf`, with the only textual conflict resolved by preserving the union of upstream v2 test dependencies and fork OAuth coverage;
+- integration added the required `ISessionIndex.locate` method to four kap-server test doubles introduced by the combined history; agent-core-v2 import lint and the agent-core-v2, node-sdk, CLI, and kap-server typechecks pass;
+- focused suites pass: node-sdk `23/23`, TUI `160/160`, and kap-server `72/72`; the full v2 run passes `4,927` tests and has five host filesystem-watch failures, while an independent Node `fs.watch` probe also observed zero events, isolating the remaining failure to the current macOS FSEvents environment rather than the merged behavior;
+- native SEA build, injection, ad-hoc signing, signature verification, and native smoke pass; `/Users/noelbao/.kiminn/bin/kimi` reports `0.34.0` and has SHA-256 `a9badec6cc756b529dea2957deaa24f620452f597a92b59e5c8096f44f6ab03a`;
+- installed session `session_220ce0a6-3120-4546-8d8c-a015b53bc049` returned exact `KIMINN_CUMI_619564_RBV_OK`; its wire records show `openai_responses`, `gpt-5.6-sol`, `xhigh`, and `maxTokens: 272000`, while the gateway joined safe account label `codex-kg` and recorded `1/1` terminal success, zero failures, and HTTP 200;
+- the isolated and canonical binaries remain different (`a9badec6…` vs `9f4337e1…`), as do their configs (`83e076e6…` vs `15ca0bd8…`); the operation wrote only the isolated install and its backup, and preserved canonical storage for shared session history.
 
 Local recovery:
 
