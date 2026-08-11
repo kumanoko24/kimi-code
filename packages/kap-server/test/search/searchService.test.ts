@@ -60,6 +60,7 @@ function makeSessionIndex(list: ISessionIndex['listRecent']): ISessionIndex {
     status: () => ({ state: 'uninitialized', degradedCount: 0 }),
     listRecent: list,
     get: async () => undefined,
+    locate: async () => undefined,
     count: async () => 0,
     remove: async () => {},
   };
@@ -1678,6 +1679,7 @@ describe('GlobalSearchService', () => {
         status: () => ({ state: 'uninitialized', degradedCount: 0 }),
         listRecent: async () => ({ items: summaries, nextCursor: undefined }),
         get: async (id) => byId.get(id),
+        locate: async () => undefined,
         count: async () => summaries.length,
         remove: async () => {},
       };
