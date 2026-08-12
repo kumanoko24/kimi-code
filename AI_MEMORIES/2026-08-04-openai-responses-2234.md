@@ -1,15 +1,15 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-08-12T02:10:48+08:00`
+- updated_at: `2026-08-13T01:37:25+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` provider observability, tmux identity, and managed-Kimi video fallback
-- current milestone: M19 — upstream sync and isolated kiminn deployment
+- current milestone: M20 — upstream 0.35 sync and isolated kiminn deployment
 - next milestones: none
-- status: PASS (`M1` through `M19` independently PASS)
+- status: PASS (`M1` through `M20` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
 - gateway commits: `4075d67`, `d45deb0`, `b383c5c`
-- live rollback boundary: restore isolated files from `/Users/noelbao/.kiminn/backups/cumi-619564dcf-20260812-0208/` and roll gateway artifact `09b8dbd1ceb537acb27c3e875474017b851a0ced489d92a86457e6a171c7eab5.whl` back to `f395b5ccc08399b99f04c1aafed68da6385588ef6a4b5fea6c952eaa34b0be2c.whl`
+- live rollback boundary: restore isolated files from `/Users/noelbao/.kiminn/backups/cumi-fe3cdae5f-20260813-0135/` and roll gateway artifact `09b8dbd1ceb537acb27c3e875474017b851a0ced489d92a86457e6a171c7eab5.whl` back to `f395b5ccc08399b99f04c1aafed68da6385588ef6a4b5fea6c952eaa34b0be2c.whl`
 
 ## Invariants
 
@@ -566,6 +566,27 @@ Evidence:
 - native SEA build, injection, ad-hoc signing, signature verification, and native smoke pass; `/Users/noelbao/.kiminn/bin/kimi` reports `0.34.0` and has SHA-256 `a9badec6cc756b529dea2957deaa24f620452f597a92b59e5c8096f44f6ab03a`;
 - installed session `session_220ce0a6-3120-4546-8d8c-a015b53bc049` returned exact `KIMINN_CUMI_619564_RBV_OK`; its wire records show `openai_responses`, `gpt-5.6-sol`, `xhigh`, and `maxTokens: 272000`, while the gateway joined safe account label `codex-kg` and recorded `1/1` terminal success, zero failures, and HTTP 200;
 - the isolated and canonical binaries remain different (`a9badec6…` vs `9f4337e1…`), as do their configs (`83e076e6…` vs `15ca0bd8…`); the operation wrote only the isolated install and its backup, and preserved canonical storage for shared session history.
+
+### M20 — upstream 0.35 sync and isolated kiminn deployment (PASS)
+
+Intent:
+
+- merge current `MoonshotAI/main` at `fe3cdae5f` into the fork branch without mutating upstream;
+- preserve fork-owned Responses compaction, split session homes, provider observability, and bilingual documentation while integrating upstream 0.35 TUI, server, session pagination, plugin, and cancellation behavior;
+- rebuild and deploy only the isolated `kiminn`, then prove its real localhost-2234 lifecycle.
+
+Recovery boundary: revert merge commit `84e79e866` and restore `/Users/noelbao/.kiminn/bin/kimi`, config, TUI config, receipt, and wrapper from `/Users/noelbao/.kiminn/backups/cumi-fe3cdae5f-20260813-0135/`. Canonical Kimi and the gateway require no rollback.
+
+Evidence:
+
+- local and origin started identical at `a0794eb2b`; upstream advanced by 18 commits from `619564dcf` to `fe3cdae5f`. Merge commit `84e79e866ab61715de3c731023604c77dade7791` records `a0794eb2b` and `fe3cdae5f` as parents;
+- five textual conflicts were resolved by union: bilingual env docs retain split-home variables plus upstream web password; v2 compaction retains opaque provider state plus the common reminder wrapper; full-compaction tests retain both native-compaction and loop-quiescence contracts; node-sdk paging refill now resolves every session through `ISessionIndex.locate()` before deriving its owning home;
+- the merged request shape moved the full-compaction telemetry baseline to the measured `14,409` tokens. The upstream search route test also now waits for all three promised roles instead of stopping on the first asynchronous hit, and the fork's provider-observability fixture supplies upstream's required `stepRetry` state;
+- final gates pass: agent-core-v2 import boundary and all four affected typechecks; agent-core-v2 `4,984/4,984`; node-sdk `363` passing with one todo; CLI `2,789` passing with two skips; kap-server `1,024/1,024`; focused compaction `76/76`, focused SDK `50/50`, provider observability `5/5`, changed-file lint with zero errors, and the bilingual VitePress build;
+- native SEA build, ad-hoc signature verification, and native smoke pass. Installed `/Users/noelbao/.kiminn/bin/kimi` reports `0.35.0` and matches the build at SHA-256 `2609a020bb237712936da3295d9f890b67d519bfed65657caf487f0f9a997d64`;
+- installed session `session_76f1b7f6-751c-4606-9f9c-c876cd6e12a0` returned exact `KIMINN_CUMI_FE3CDAE_RBV_OK`; its canonical-home wire records show `openai_responses`, `gpt-5.6-sol`, `xhigh`, and `maxTokens: 272000`;
+- gateway telemetry for the same identity reports idle Responses state, HTTP 200, `1/1` terminal success, zero failures, and healthy account label `codex-leo`; pre-deploy telemetry was READY with five eligible accounts and zero in-flight or active sessions;
+- canonical Kimi stayed unchanged at binary SHA-256 `9f4337e1…` and config SHA-256 `15ca0bd8…`; isolated config, TUI config, and wrapper also retained their pre-deploy hashes.
 
 Local recovery:
 
