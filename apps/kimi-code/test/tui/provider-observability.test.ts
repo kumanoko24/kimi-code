@@ -28,6 +28,7 @@ const state = {
   isReplaying: false,
   streamingPhase: 'idle',
   streamingStartTime: 0,
+  stepRetry: null,
   theme: 'dark',
   editorCommand: null,
   notifications: { enabled: true, condition: 'unfocused' },
