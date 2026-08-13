@@ -609,6 +609,26 @@ Evidence:
 - isolated config, TUI config, and wrapper hashes stayed `83e076e6…`, `09d7953c…`, and `6729dac0…`. Canonical Kimi was already independently at `0.36.0` before this isolated deployment and remained byte-identical across it at binary SHA-256 `d711c059…` and config SHA-256 `15ca0bd8…`;
 - `/Users/noelbao/.kiminn/install-receipt.toml` records the exact source/upstream commits, binary/config hashes, RBV session, split homes, and rollback directory.
 
+### M22 — MCP OAuth callback upstream sync and isolated kiminn deployment (PASS)
+
+Intent:
+
+- merge current `MoonshotAI/main` at `102984aa6` into the fork without mutating upstream;
+- accept upstream's MCP OAuth cancellation fix and its patch changeset without altering fork-owned 2234 behavior;
+- rebuild and deploy only isolated `kiminn`, then prove its real parent, exact-bound subagent, resume, storage, and localhost-2234 lifecycle.
+
+Recovery boundary: revert merge commit `4fdd39acb` and restore `/Users/noelbao/.kiminn/bin/kimi`, config, TUI config, receipt, and wrapper from `/Users/noelbao/.kiminn/backups/cumi-102984aa6-20260814-0040/`. Canonical Kimi and the gateway require no rollback.
+
+Evidence:
+
+- fresh fetch advanced upstream by one commit from `1414d4602` to `102984aa660d752ba8dd7d1aba155575f32affe2`; merge commit `4fdd39acb01f314e01fff7135ac2e14c034f44c2` applied without conflicts;
+- the new real localhost OAuth callback and service-cancellation tests pass `3/3`; agent-core typecheck passes. The monorepo passes 1,107 test files with `18,519` tests, three expected failures, 80 skips, and two todos; full build and typecheck pass, while lint reports zero errors and 3,012 existing warnings;
+- native SEA build, injection, ad-hoc signing, signature verification, native smoke, installed `kiminn doctor`, provider listing, and config parsing pass. Installed `/Users/noelbao/.kiminn/bin/kimi` reports `0.36.0` and matches the build at SHA-256 `3dab087f40bdc4a81a8673e970fc0af1451960bc81481e5a570151dc619a8401`;
+- installed session `session_8ad56c88-bd65-45ea-9681-669339f4923e` returned exact `TASKER_102984_OK` from `gpt-coder-tasker`, exact parent `KIMINN_102984_RBV_OK`, and exact resumed `KIMINN_102984_RESUME_OK`. Wire facts show three parent requests on OpenAI Responses Sol/xhigh/272000 and one child request on OpenAI Responses Luna/max/272000; both parent turns and the child turn ended `completed`;
+- the session exists only under canonical `~/.kimi-code/sessions`, preserving split-home ownership. Live gateway telemetry for the same affinity reports idle state, zero in-flight requests, safe account label `codex-leo`, and `4/4` HTTP 200 successes with usage observed for all four requests; `/dashboard` returned HTTP 200;
+- isolated config, TUI config, and wrapper hashes stayed `83e076e6…`, `09d7953c…`, and `6729dac0…`. Canonical Kimi remained byte-identical at binary SHA-256 `d711c059…` and config SHA-256 `15ca0bd8…`;
+- `/Users/noelbao/.kiminn/install-receipt.toml` records source `4fdd39acb`, upstream `102984aa6`, binary/config hashes, RBV session, split homes, and the rollback directory.
+
 Local recovery:
 
 - pre-change Kimi config: `/Users/noelbao/.kimi-code/backups/openai-responses-20260804-0550/config.toml`;
