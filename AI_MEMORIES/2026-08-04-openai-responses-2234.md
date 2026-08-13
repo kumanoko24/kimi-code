@@ -588,6 +588,27 @@ Evidence:
 - gateway telemetry for the same identity reports idle Responses state, HTTP 200, `1/1` terminal success, zero failures, and healthy account label `codex-leo`; pre-deploy telemetry was READY with five eligible accounts and zero in-flight or active sessions;
 - canonical Kimi stayed unchanged at binary SHA-256 `9f4337e1…` and config SHA-256 `15ca0bd8…`; isolated config, TUI config, and wrapper also retained their pre-deploy hashes.
 
+### M21 — upstream 0.36 sync and isolated kiminn deployment (PASS)
+
+Intent:
+
+- merge current `MoonshotAI/main` at `1414d4602` into the fork without mutating upstream;
+- accept upstream's declarative subagent model pool and 0.36 session-lifecycle changes while preserving the fork's experimental exact model/thinking bindings from agent files;
+- rebuild and deploy only isolated `kiminn`, then prove a real parent, exact-bound subagent, resume, storage, and localhost-2234 lifecycle.
+
+Recovery boundary: revert merge commit `6848ae3b5` and restore `/Users/noelbao/.kiminn/bin/kimi`, config, TUI config, receipt, and wrapper from `/Users/noelbao/.kiminn/backups/cumi-1414d4602-20260813-2140/`. Canonical Kimi and the gateway require no rollback.
+
+Evidence:
+
+- upstream advanced by 19 commits from `fe3cdae5f` to `1414d4602898f406e540b23342cb18db23ff9efc`; merge commit `6848ae3b56a641d5c52bf3d189e9d67615db447f` integrates release `0.36.0`;
+- 14 textual conflicts were resolved by preserving upstream's model-pool, session-lifecycle, workspace, OAuth, and terminology contracts plus fork-owned gateway `/usage`, agent-file `model` / `thinking_effort`, and exact-binding behavior. Binding precedence is forced pool, explicit tool choice, enabled exact profile binding, pool default, then caller inheritance;
+- targeted conflict suites pass `282/282`; Node SDK integration passes `35/35`; full agent-core-v2 passes `5,066/5,066`; the monorepo passes 1,106 test files with `18,516` tests, three expected failures, 80 skips, and two todos. Full package/application build and typecheck pass; lint reports zero errors;
+- native SEA build, ad-hoc signature verification, native smoke, installed `kiminn doctor`, and config parsing pass. Installed `/Users/noelbao/.kiminn/bin/kimi` reports `0.36.0` and matches the build at SHA-256 `eef86297580e918c52653f7bf71c007748384f524fcc9da813e4578b43d459e6`;
+- installed session `session_8eebc624-172e-4fd2-b0ad-90c9a230a423` returned exact `TASKER_036_OK` from `gpt-coder-tasker`, exact parent `KIMINN_036_RBV_OK`, and exact resumed `KIMINN_036_RESUME_OK`. Wire facts show the parent on OpenAI Responses Sol/xhigh/272000 for three requests and the child on OpenAI Responses Luna/max/272000 for one request; both parent turns and the child turn ended normally;
+- the session exists only under canonical `~/.kimi-code/sessions`, preserving split-home ownership. Live gateway telemetry for the same explicit affinity reports idle state, zero in-flight requests, safe account label `codex-fst`, fresh quota, and `4/4` HTTP 200 successes with observed usage for every request; `/dashboard` returned HTTP 200;
+- isolated config, TUI config, and wrapper hashes stayed `83e076e6…`, `09d7953c…`, and `6729dac0…`. Canonical Kimi was already independently at `0.36.0` before this isolated deployment and remained byte-identical across it at binary SHA-256 `d711c059…` and config SHA-256 `15ca0bd8…`;
+- `/Users/noelbao/.kiminn/install-receipt.toml` records the exact source/upstream commits, binary/config hashes, RBV session, split homes, and rollback directory.
+
 Local recovery:
 
 - pre-change Kimi config: `/Users/noelbao/.kimi-code/backups/openai-responses-20260804-0550/config.toml`;
