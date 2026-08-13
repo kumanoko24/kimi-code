@@ -10,6 +10,11 @@ import { Event } from '#/_base/event';
 import { ILogService } from '#/_base/log/log';
 import { IBootstrapService } from '#/app/bootstrap/bootstrap';
 import { IConfigService } from '#/app/config/config';
+import { IModelCatalog } from '#/kosong/model/catalog';
+import { IModelService } from '#/kosong/model/model';
+import { IProviderService } from '#/kosong/provider/provider';
+import { stubProviderService } from '../provider/stubs';
+import { IFlagService } from '#/app/flag/flag';
 import { ICronTaskPersistence } from '#/app/cron/cronTaskPersistence';
 import { IEventService } from '#/app/event/event';
 import { IHostEnvironment } from '#/os/interface/hostEnvironment';
@@ -51,6 +56,7 @@ import { WorkspaceToolPolicyService } from '#/workspace/workspaceToolPolicy/work
 import { recordingTelemetry, type TelemetryRecord } from '../telemetry/stubs';
 import { stubLog } from '../../_base/log/stubs';
 import { stubBootstrap } from '../bootstrap/stubs';
+import { stubFlag } from '../../app/flag/stubs';
 
 import { IWorkspaceLifecycleService } from '#/app/workspaceLifecycle/workspaceLifecycle';
 import { WorkspaceLifecycleService } from '#/app/workspaceLifecycle/workspaceLifecycleService';
@@ -148,6 +154,7 @@ function sessionStubs(): ReturnType<typeof stubPair>[] {
       read: () => Promise.resolve({} as never),
       update: () => Promise.resolve(),
       setTitle: () => Promise.resolve(),
+      setGeneratedTitleIfUncustomized: () => Promise.resolve(false),
       setArchived: () => Promise.resolve(),
       registerAgent: () => Promise.resolve(),
     } satisfies ISessionMetadata),
@@ -325,6 +332,13 @@ describe('WorkspaceLifecycleService', () => {
       stubPair(ISessionIndex, sessionIndexStub()),
       stubPair(ISessionIndexMirror, sessionIndexMirrorStub()),
       stubPair(IConfigService, { get: () => undefined } as unknown as IConfigService),
+      stubPair(IModelCatalog, { _serviceBrand: undefined } as unknown as IModelCatalog),
+      stubPair(IModelService, {
+        _serviceBrand: undefined,
+        ready: Promise.resolve(),
+      } as unknown as IModelService),
+      stubPair(IProviderService, stubProviderService()),
+      stubPair(IFlagService, stubFlag(() => false)),
       stubPair(IAppendLogStore, {
         _serviceBrand: undefined,
         append: () => {},

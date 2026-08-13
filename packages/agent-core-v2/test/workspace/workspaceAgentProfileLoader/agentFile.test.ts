@@ -58,7 +58,6 @@ describe('parseAgentFileText', () => {
     const def = parse('---\nname: solo\ndescription: d\n---\n\nbody\n');
 
     expect(def.override).toBe(false);
-    expect(def.modelPreference).toBeUndefined();
     expect(def.tools).toBeUndefined();
     expect(def.disallowedTools).toBeUndefined();
     expect(def.subagents).toBeUndefined();
@@ -359,12 +358,6 @@ describe('agentProfileFromFile', () => {
     const profile = agentProfileFromFile({ ...base, subagents: ['explore'] }, basePrompt);
 
     expect(profile.subagents).toEqual(['explore']);
-  });
-
-  it('passes the model preference through', () => {
-    const profile = agentProfileFromFile({ ...base, modelPreference: 'secondary' }, basePrompt);
-
-    expect(profile.modelPreference).toBe('secondary');
   });
 
   it('treats an explicit file as an override intent', () => {
