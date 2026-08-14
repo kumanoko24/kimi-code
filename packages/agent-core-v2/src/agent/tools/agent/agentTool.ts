@@ -380,6 +380,7 @@ export class SubagentTool implements ISubagentTool {
     return {
       agentId,
       profileName,
+      parentToolCallId: toolCallId,
       model: displayModel,
       thinkingEffort: this.lifecycle
         .get(agentId)
