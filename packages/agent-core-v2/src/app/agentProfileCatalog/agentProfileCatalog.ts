@@ -37,7 +37,7 @@
  */
 
 import type { ILogger } from '#/_base/log/log';
-import type { ISessionProcessRunner } from '#/session/process/processRunner';
+import type { IHostProcessService } from '#/os/interface/hostProcess';
 
 export const DEFAULT_AGENT_PROFILE_NAME = 'agent';
 
@@ -45,7 +45,7 @@ export type AgentModelPreference = 'primary' | 'secondary';
 
 export interface AgentProfilePromptPrefixContext {
   readonly cwd: string;
-  readonly runner: ISessionProcessRunner;
+  readonly process: IHostProcessService;
   readonly log?: ILogger;
 }
 
