@@ -126,7 +126,12 @@ async function createRuntimeRig(extraAliases: readonly string[] = []): Promise<R
       try {
         await closeProvider();
       } finally {
-        await rm(rootDir, { recursive: true, force: true });
+        await rm(rootDir, {
+          recursive: true,
+          force: true,
+          maxRetries: 5,
+          retryDelay: 50,
+        });
       }
     }
   });
@@ -154,7 +159,14 @@ async function createPlainHarness(homeDir: string): Promise<KimiHarness> {
 
 async function createMcpHandlerRig(): Promise<McpHandlerRig> {
   const homeDir = await mkdtemp(join(tmpdir(), "kimi-vscode-mcp-handler-"));
-  cleanups.push(() => rm(homeDir, { recursive: true, force: true }));
+  cleanups.push(() =>
+    rm(homeDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 50,
+    }),
+  );
   const harness = await createPlainHarness(homeDir);
   const broadcasts: BroadcastRecord[] = [];
   const logs: LogRecord[] = [];
