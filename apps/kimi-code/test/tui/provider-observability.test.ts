@@ -20,6 +20,7 @@ const state = {
   planMode: false,
   inputMode: 'prompt',
   swarmMode: false,
+  towerMode: false,
   thinkingEffort: 'xhigh',
   contextUsage: 0,
   contextTokens: 0,

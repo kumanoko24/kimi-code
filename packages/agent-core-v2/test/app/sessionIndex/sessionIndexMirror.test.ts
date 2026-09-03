@@ -14,6 +14,7 @@ import { createScopedTestHost, stubPair } from '#/_base/di/test';
 import { ILogService } from '#/_base/log/log';
 import { IBootstrapService } from '#/app/bootstrap/bootstrap';
 import { IFlagService } from '#/app/flag/flag';
+import { ITelemetryService, noopTelemetryService } from '#/app/telemetry/telemetry';
 import { ISessionIndexMirror } from '#/app/sessionIndex/sessionIndex';
 import {
   SESSION_INDEX_MANIFEST,
@@ -88,6 +89,7 @@ describe('SessionIndexMirror', () => {
       stubPair(IBootstrapService, stubBootstrap(homeDir)),
       stubPair(ILogService, stubLog()),
       stubPair(IFlagService, stubFlag(flagEnabled)),
+      stubPair(ITelemetryService, noopTelemetryService),
     ]);
     disposeHost = () => {
       host.dispose();
@@ -156,13 +158,12 @@ describe('SessionIndexMirror', () => {
       stubPair(IBootstrapService, stubBootstrap(homeDir)),
       stubPair(ILogService, stubLog()),
       stubPair(IFlagService, stubFlag(true)),
+      stubPair(ITelemetryService, noopTelemetryService),
     ]);
     disposeHost = () => {
       host.dispose();
     };
     queryStore = host.app.accessor.get(IQueryStore);
-    // Hang the store: every manifest read takes a second. record() must stay
-    // synchronous regardless — the user mutation path never waits.
     const real = queryStore.getCheckpoint.bind(queryStore);
     queryStore.getCheckpoint = async (source: string) => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -183,8 +184,6 @@ describe('SessionIndexMirror', () => {
     build();
     mirror.record(summary('a'));
     await mirror.drain();
-    // Nothing lost: without a published generation the entries stay queued
-    // (the running projection covers them from the authoritative documents).
     expect(mirror.pending().map((s) => s.id)).toEqual(['a']);
   });
 
@@ -204,7 +203,6 @@ describe('SessionIndexMirror', () => {
 
     mirror.record(summary('a', { updatedAt: 7 }));
     await mirror.drain();
-    // The first drain attempt failed; the entries must still be queued.
     expect(mirror.pending().map((s) => s.id)).toEqual(['a']);
 
     await mirror.drain();

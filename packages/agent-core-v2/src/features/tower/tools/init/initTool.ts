@@ -1,25 +1,18 @@
-/**
- * `tools` domain — `TowerInitTool` implementation (the `TowerInit` tool).
- *
- * Creates the `.tower/` workspace through the protocol `TowerStore` rooted at
- * the session cwd (`sessionContext`), enters tower mode via `tower`, and
- * activates the tower tool set through `profile`. Idempotent within a
- * session: re-running against an existing workspace reports `created: false`
- * and keeps all state (e.g. after a session resume). Re-running from a
- * *different* session adopts the workspace: roster entries the previous
- * session spawned are retired (their engine agent ids are session-scoped and
- * cannot be resumed here), missions and worktrees are preserved, and the
- * output tells the tower which names were retired so it can respawn.
- * Registered for the main agent only. Bound at Agent scope.
- */
-
-import { IAgentProfileService } from '#/agent/profile/profile';
-import { IAgentTowerService, TOWER_TOOL_NAMES } from '#/features/tower/tower';
+import { IAgentScopeContext } from '#/agent/scopeContext/scopeContext';
+import { ISessionManager } from '#/app/sessionManager/sessionManager';
+import { IAgentTowerService } from '#/features/tower/tower';
+import { TowerProtocolError } from '#/features/tower/protocol/index';
+import { MAIN_AGENT_ID } from '#/session/agentLifecycle/agentLifecycle';
 import { ISessionContext } from '#/session/sessionContext/sessionContext';
 import { toInputJsonSchema } from '#/tool/input-schema';
 import type { ToolExecution } from '#/tool/toolContract';
 
-import { newTowerStore, runTowerTool } from '../support';
+import {
+  newTowerStore,
+  runTowerTool,
+  TOWER_MAIN_AGENT_ONLY,
+  TOWER_MODE_USER_ENABLED_ONLY,
+} from '../support';
 import DESCRIPTION from './init.md?raw';
 import { ITowerInitTool, TowerInitToolInputSchema, type TowerInitToolInput } from './init';
 
@@ -32,26 +25,70 @@ export class TowerInitTool implements ITowerInitTool {
   constructor(
     @ISessionContext private readonly sessionContext: ISessionContext,
     @IAgentTowerService private readonly tower: IAgentTowerService,
-    @IAgentProfileService private readonly profile: IAgentProfileService,
+    @ISessionManager private readonly sessions: ISessionManager,
+    @IAgentScopeContext private readonly scopeContext: IAgentScopeContext,
   ) {}
 
-  resolveExecution(_args: TowerInitToolInput): ToolExecution {
+  resolveExecution(args: TowerInitToolInput): ToolExecution {
+    if (this.scopeContext.agentId !== MAIN_AGENT_ID) {
+      return {
+        isError: true,
+        output: TOWER_MAIN_AGENT_ONLY,
+      };
+    }
+    if (!this.tower.isActive) {
+      return {
+        isError: true,
+        output: TOWER_MODE_USER_ENABLED_ONLY,
+      };
+    }
     return {
       description: 'Initializing tower workspace',
       approvalRule: this.name,
       execute: () =>
         runTowerTool(async () => {
           const store = newTowerStore(this.sessionContext);
-          const result = await store.init(this.sessionContext.sessionId);
-          this.tower.enter();
-          for (const name of TOWER_TOOL_NAMES) this.profile.addActiveTool(name);
+          const priorOwner = await store.load().then(
+            (state) => state.sessionId,
+            () => undefined,
+          );
+          if (
+            priorOwner !== undefined &&
+            priorOwner !== this.sessionContext.sessionId &&
+            this.sessions.get(priorOwner) !== undefined
+          ) {
+            throw new TowerProtocolError(
+              `tower workspace is owned by a live session (${priorOwner}) — adopting it would retire that session's roster. Use the tower from that session, or close it first.`,
+            );
+          }
+          const result = await store.init(
+            this.sessionContext.sessionId,
+            args.base ?? this.tower.requestedBase,
+          );
           return {
             output: [
               result.created
                 ? 'tower workspace initialized'
                 : 'tower workspace already initialized — existing state preserved',
               `base branch: ${result.base}`,
+              ...(result.ignoredBase !== undefined
+                ? [
+                    `requested base "${result.ignoredBase}" ignored — the existing workspace already records base "${result.base}"; tear it down first to rebase the tower`,
+                  ]
+                : []),
+              ...(result.checkout !== result.base
+                ? [
+                    result.checkout === 'HEAD'
+                      ? `note: the main checkout is in a detached HEAD state — merges stay blocked until the base is checked out (git checkout ${result.base})`
+                      : `note: the main checkout is on "${result.checkout}", not base "${result.base}" — merges stay blocked until it is switched over (git checkout ${result.base})`,
+                  ]
+                : []),
               'workspace: .tower/ (comms under .tower/comms/, worktrees under .tower/worktrees/)',
+              ...(result.openMissions.length > 0
+                ? [
+                    `carried-over open missions: ${result.openMissions.join(', ')} — their scopes are still reserved. Continue them (TowerSpawn fresh workers), or — when they belong to an unrelated earlier task — abandon them first (TowerMission status=abandoned) so a new plan can use those files.`,
+                  ]
+                : []),
               ...(result.retiredAgents.length > 0
                 ? [
                     `adopted from a previous session — retired its stale roster entries: ${result.retiredAgents.join(', ')}. ` +
@@ -67,4 +104,3 @@ export class TowerInitTool implements ITowerInitTool {
     };
   }
 }
-

@@ -1,18 +1,10 @@
-/**
- * `tools` domain — `TowerMergeTool` implementation (the `TowerMerge` tool).
- *
- * Merges a mission branch through the protocol `TowerStore` rooted at the
- * session cwd (`sessionContext`); after a successful merge it reports which
- * unmerged branches touched the same files (they must rebase — their moved
- * tip then fails the reviewed_commit gate, forcing a re-review). Registered
- * for the main agent only. Bound at Agent scope.
- */
-
+import { IAgentScopeContext } from '#/agent/scopeContext/scopeContext';
+import { MAIN_AGENT_ID } from '#/session/agentLifecycle/agentLifecycle';
 import { ISessionContext } from '#/session/sessionContext/sessionContext';
 import { toInputJsonSchema } from '#/tool/input-schema';
 import type { ToolExecution } from '#/tool/toolContract';
 
-import { newTowerStore, runTowerTool } from '../support';
+import { newTowerStore, runTowerTool, TOWER_MAIN_AGENT_ONLY } from '../support';
 import DESCRIPTION from './merge.md?raw';
 import { ITowerMergeTool, TowerMergeToolInputSchema, type TowerMergeToolInput } from './merge';
 
@@ -22,9 +14,18 @@ export class TowerMergeTool implements ITowerMergeTool {
   readonly description: string = DESCRIPTION;
   readonly parameters: Record<string, unknown> = toInputJsonSchema(TowerMergeToolInputSchema);
 
-  constructor(@ISessionContext private readonly sessionContext: ISessionContext) {}
+  constructor(
+    @ISessionContext private readonly sessionContext: ISessionContext,
+    @IAgentScopeContext private readonly scopeContext: IAgentScopeContext,
+  ) {}
 
   resolveExecution(args: TowerMergeToolInput): ToolExecution {
+    if (this.scopeContext.agentId !== MAIN_AGENT_ID) {
+      return {
+        isError: true,
+        output: TOWER_MAIN_AGENT_ONLY,
+      };
+    }
     return {
       description: `Merging tower branch: ${args.branch}`,
       approvalRule: this.name,

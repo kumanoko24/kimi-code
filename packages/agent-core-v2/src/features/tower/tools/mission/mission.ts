@@ -1,14 +1,3 @@
-/**
- * `tools` domain — `ITowerMissionTool` contract (the `TowerMission` tool).
- *
- * Public contract of the mission reader/patcher: called with only an id it
- * returns the rendered mission view; with patch fields it applies them
- * through the store (workers may only patch their own mission; ownership
- * assignment stays with the tower). Exports the model-facing
- * `TowerMissionToolInputSchema` / `TowerMissionToolInput` and the
- * `ITowerMissionTool` DI decorator. Bound at Agent scope.
- */
-
 import { z } from 'zod';
 
 import { createDecorator } from '#/_base/di/instantiation';
@@ -18,9 +7,11 @@ export const TowerMissionToolInputSchema = z
   .object({
     id: z.string().describe('Mission id (e.g. "M1")'),
     status: z
-      .enum(['planned', 'active', 'completed', 'blocked', 'paused', 'merged'])
+      .enum(['planned', 'active', 'completed', 'blocked', 'paused', 'merged', 'abandoned'])
       .optional()
-      .describe('New lifecycle status'),
+      .describe(
+        'New lifecycle status. "abandoned" is tower-only: it gives the mission up without merging — releasing its scope, satisfying its dependents, and excluding its branch from conflict checks.',
+      ),
     note: z.string().optional().describe('Append a decision-log note'),
     blocker: z.string().optional().describe('Report a blocker (also sets status to blocked)'),
     clear_blockers: z.boolean().optional().describe('Clear all recorded blockers'),

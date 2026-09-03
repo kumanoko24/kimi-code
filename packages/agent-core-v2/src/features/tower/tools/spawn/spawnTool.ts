@@ -1,53 +1,12 @@
-/**
- * `tools` domain — `TowerSpawnTool` implementation (the `TowerSpawn` tool).
- *
- * The tower's worker/reviewer launcher, ported from v1
- * (`agent-core/src/tools/builtin/tower/spawn.ts`) onto v2's spawn composition:
- * the briefing prompt is assembled here from the mission/review briefing
- * (never by the tower LLM), the roster/worktree/mission bookkeeping goes
- * through `TowerStore` (`tower` domain protocol), the agent is created
- * through `IAgentLifecycleService` with the `tower-worker` profile and driven
- * via `ISessionSubagentService.run` mirrored onto the tower's record stream
- * (`mirrorAgentRun`), and the run is registered detached with
- * `IAgentTaskService` under a `SubagentTask` — the same background path as
- * the `Agent` tool. Spawn concurrency is gated by `ITowerRateLimitService`;
- * the slot is released when the agent's completion settles (or immediately on
- * a launch/registration failure). The worker's model binding follows the same
- * rule as the `Agent`/`AgentSwarm` tools (`resolveSubagentBinding`): the
- * configured secondary model while the secondary-model experiment is on,
- * otherwise the tower's own model — except reviewers, who always bind the
- * tower's (primary) model. The resolved model is reported in the tool output
- * and the `spawn` line of the tower activity log. The spawned agent is pinned
- * to the `auto` permission mode regardless of the tower's own mode: workers
- * and reviewers run detached and unattended, so per-call approval prompts
- * would serialize the fleet on the user's attention (and with no approval
- * broker attached they silently auto-approve anyway). User-configured deny
- * rules and the tower-worker write guard still apply — both adjudicate
- * independently of the mode. `broadcastPermissionMode` skips
- * `tower-worker`-profile agents, so a later session-wide mode switch does not
- * move them off `auto` either.
- *
- * Deliberate v2 adaptation — no per-agent cwd: v1 confined each worker by
- * overriding its process cwd to the worktree. v2 freezes the session cwd by
- * design (every agent shares it), so confinement is instead (a) briefed —
- * `buildPrompt` states the worker's absolute worktree path and instructs it
- * to address every file operation (and every Bash `cd`) at that path — and
- * (b) enforced — the tower-worker write guard in `towerService.ts` hard-denies
- * Write/Edit outside the roster-recorded worktree. `buildPrompt` is otherwise
- * a verbatim v1 port; only the cwd-relative phrasing changed.
- *
- * Registered main-only (the tower) by `towerFeature.ts`. Bound at Agent
- * scope.
- */
-
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { IAgentScopeHandle } from '#/_base/di/scope';
+import type { AgentContext } from '#/agent/agentContext/agentContext';
 import { IAgentProfileService } from '#/agent/profile/profile';
 import { IAgentScopeContext } from '#/agent/scopeContext/scopeContext';
 import { IAgentPermissionModeService } from '#/agent/permissionMode/permissionMode';
 import { IAgentTaskService } from '#/agent/task/task';
+import { isAgentTaskTerminal } from '#/agent/task/taskService';
 import {
   GitError,
   MISSIONS_DIR,
@@ -71,12 +30,14 @@ import {
   type ExecutableToolResult,
   type ToolExecution,
 } from '#/tool/toolContract';
-import { IAgentLifecycleService } from '#/session/agentLifecycle/agentLifecycle';
+import { IAgentLifecycleService, MAIN_AGENT_ID } from '#/session/agentLifecycle/agentLifecycle';
 import { subagentLabels } from '#/session/agentLifecycle/subagentMetadata';
 import { ISessionContext } from '#/session/sessionContext/sessionContext';
 import {
   DEFAULT_SUBAGENT_TIMEOUT_MS,
+  isSubagentModelForced,
   resolveSubagentBinding,
+  resolveSubagentThinking,
   wrapSubagentModelError,
 } from '#/session/subagent/configSection';
 import { emitAgentRunSpawned, mirrorAgentRun } from '#/session/subagent/mirrorAgentRun';
@@ -84,6 +45,7 @@ import { ISessionSubagentService } from '#/session/subagent/subagent';
 
 import { SubagentTask, type SubagentHandle } from '#/agent/tools/agent/subagent-task';
 
+import { TOWER_MAIN_AGENT_ONLY, TOWER_MODE_USER_ENABLED_ONLY } from '../support';
 import { ITowerSpawnTool, TowerSpawnToolInputSchema, type TowerSpawnToolInput } from './spawn';
 import DESCRIPTION from './spawn.md?raw';
 
@@ -102,7 +64,7 @@ export class TowerSpawnTool implements ITowerSpawnTool {
     @ITowerRateLimitService private readonly rateLimit: ITowerRateLimitService,
     @ISessionContext private readonly sessionContext: ISessionContext,
     @IAgentScopeContext scopeContext: IAgentScopeContext,
-    @IAgentLifecycleService private readonly lifecycle: IAgentLifecycleService,
+    @IAgentLifecycleService private readonly agentLifecycle: IAgentLifecycleService,
     @ISessionSubagentService private readonly subagents: ISessionSubagentService,
     @IAgentTaskService private readonly tasks: IAgentTaskService,
     @IAgentProfileService private readonly profile: IAgentProfileService,
@@ -114,6 +76,12 @@ export class TowerSpawnTool implements ITowerSpawnTool {
   }
 
   resolveExecution(args: TowerSpawnToolInput): ToolExecution {
+    if (this.callerAgentId !== MAIN_AGENT_ID) {
+      return {
+        isError: true,
+        output: TOWER_MAIN_AGENT_ONLY,
+      };
+    }
     return {
       description: `Spawning tower ${args.kind} "${args.name}"`,
       approvalRule: this.name,
@@ -132,7 +100,7 @@ export class TowerSpawnTool implements ITowerSpawnTool {
     try {
       if (!this.tower.isActive) {
         return {
-          output: 'tower mode is not active — run TowerInit first',
+          output: TOWER_MODE_USER_ENABLED_ONLY,
           isError: true,
         };
       }
@@ -166,10 +134,15 @@ export class TowerSpawnTool implements ITowerSpawnTool {
           };
         }
         try {
-          await store.addWorktree(mission.worktree, mission.branch, state.base);
+          const added = await store.addWorktree(mission.worktree, mission.branch, state.base);
+          if (added.spawnBase !== undefined) {
+            await store.updateMission(TOWER_NAME, mission.id, { spawnBase: added.spawnBase }, { silent: true });
+            mission = { ...mission, spawnBase: added.spawnBase };
+            notes.push(
+              `base snapshot: ${added.spawnBase.slice(0, 7)} — the base checkout had uncommitted changes; they are committed as the branch's first commit (the checkout itself was left untouched)`,
+            );
+          }
         } catch (error) {
-          // The worktree may already exist (e.g. respawn after a crash) — the
-          // agent can still work in it; surface the git message and continue.
           notes.push(
             `worktree setup warning (continuing): ${error instanceof Error ? error.message : String(error)}`,
           );
@@ -187,9 +160,6 @@ export class TowerSpawnTool implements ITowerSpawnTool {
           ? `tower worker ${args.name}: ${mission.title}`
           : `tower reviewer ${args.name}: ${reviewTarget ?? ''}`;
 
-      // Adaptive concurrency gate: refused while the provider is rate-limiting
-      // (pause) or the inflight budget is exhausted. The slot is released when
-      // the agent's completion settles — or immediately on a launch failure.
       const gate = this.rateLimit.acquire();
       if (!gate.ok) {
         return { output: gate.reason, isError: true };
@@ -197,11 +167,6 @@ export class TowerSpawnTool implements ITowerSpawnTool {
       let slotHeld = true;
       try {
         const controller = new AbortController();
-        // The same binding rule as the Agent/AgentSwarm tools: the configured
-        // secondary model when the experiment is on, otherwise inherit the
-        // tower's own model. Reviewers are the exception — they always bind
-        // the tower's (primary) model: review quality is not where the
-        // secondary model saves money.
         const own = this.profile.data();
         const binding =
           own.modelAlias === undefined
@@ -210,7 +175,9 @@ export class TowerSpawnTool implements ITowerSpawnTool {
                 this.config,
                 this.flags,
                 { modelAlias: own.modelAlias, thinkingLevel: own.thinkingLevel },
-                args.kind === 'reviewer' ? 'primary' : undefined,
+                args.kind === 'reviewer' && !isSubagentModelForced(this.config)
+                  ? 'primary'
+                  : undefined,
               );
         let handle: SubagentHandle;
         try {
@@ -255,12 +222,15 @@ export class TowerSpawnTool implements ITowerSpawnTool {
           branch: mission?.branch,
           spawnedAt: new Date().toISOString(),
         });
+        const settled = this.tasks.getTask(taskId);
+        if (
+          settled !== undefined &&
+          isAgentTaskTerminal(settled.status) &&
+          settled.status !== 'completed'
+        ) {
+          await store.markAgentDied(handle.agentId, settled.status, settled.stopReason);
+        }
         if (mission !== undefined) {
-          // Only once the spawn is real (gate passed, task registered, roster
-          // written): marking the mission active+owned any earlier would leave
-          // a phantom owner behind when the gate or the launch fails. Silent:
-          // the spawn log line below already carries name/owner/mission — a
-          // second mission.update line for the same assignment is pure noise.
           await store.updateMission(
             TOWER_NAME,
             mission.id,
@@ -308,9 +278,6 @@ export class TowerSpawnTool implements ITowerSpawnTool {
         if (slotHeld) this.rateLimit.release();
       }
     } catch (error) {
-      // Expected protocol/git failures surface as error results — their
-      // messages are written as next-step guidance for the model. Unexpected
-      // (programming) errors keep propagating.
       if (error instanceof TowerProtocolError || error instanceof GitError) {
         return { output: error.message, isError: true };
       }
@@ -325,21 +292,19 @@ export class TowerSpawnTool implements ITowerSpawnTool {
     controller: AbortController,
     binding: SubagentBinding | undefined,
   ): Promise<SubagentHandle> {
-    const requester = this.lifecycle.get(this.callerAgentId);
+    const requester = this.agentLifecycle.handleOf(this.callerAgentId);
     if (requester === undefined) {
       throw new Error(`Caller agent "${this.callerAgentId}" does not exist`);
     }
 
-    let created: IAgentScopeHandle;
+    let createdContext: AgentContext;
     try {
-      // Validate the bound alias up front so a dangling [secondary_model]
-      // pointer fails the spawn here, not mid-turn inside the worker.
-      if (binding !== undefined) this.modelCatalog.get(binding.model);
-      created = await this.lifecycle.create({
+      const model = binding === undefined ? undefined : this.modelCatalog.get(binding.model);
+      createdContext = await this.agentLifecycle.create({
         binding: {
           profile: TOWER_WORKER_PROFILE,
           model: binding?.model,
-          thinking: binding?.thinking,
+          thinking: resolveSubagentThinking(this.config, model, binding?.thinking),
         },
         labels: subagentLabels(this.callerAgentId),
       });
@@ -348,20 +313,21 @@ export class TowerSpawnTool implements ITowerSpawnTool {
         ? error
         : wrapSubagentModelError(error, binding.model, this.profile.data().modelAlias);
     }
-    // Pin the spawned agent to auto (see the file header): the fleet runs
-    // unattended, and broadcastPermissionMode will not move it off auto later.
+    const created = this.agentLifecycle.handleOf(createdContext.agentId)!;
     created.accessor.get(IAgentPermissionModeService).setMode('auto');
-    const agentId = created.id;
+    const agentId = createdContext.agentId;
 
     emitAgentRunSpawned(requester, agentId, {
       profileName: TOWER_WORKER_PROFILE,
       parentToolCallId: toolCallId,
       description,
       runInBackground: true,
+      model: binding?.model,
+      modelSource: binding?.modelSource,
     });
 
     const run = await this.subagents.run(
-      agentId,
+      createdContext,
       { kind: 'prompt', prompt },
       { signal: controller.signal },
     );
@@ -380,7 +346,6 @@ export class TowerSpawnTool implements ITowerSpawnTool {
     };
   }
 
-  /** Briefings are code-assembled — the tower LLM only supplies `instructions`. */
   private async buildPrompt(
     args: TowerSpawnToolInput,
     store: TowerStore,
@@ -402,6 +367,9 @@ export class TowerSpawnTool implements ITowerSpawnTool {
         `# Your workplace\n` +
         `- Your private git worktree: ${worktreeAbs}\n` +
         `- Your branch: ${mission.branch} (base: ${state.base})\n` +
+        (mission.spawnBase !== undefined
+          ? `- Your branch starts from snapshot commit ${mission.spawnBase.slice(0, 7)}: the base checkout's uncommitted changes (WIP), captured at spawn so you can build on them. That commit is your foundation — never revert, amend, or claim it as your own work; your own commits go on top of it.\n`
+          : '') +
         `- Your working directory is the main checkout, NOT your worktree — address the worktree explicitly: every Read/Write/Edit/Grep/Glob path must be absolute and under ${worktreeAbs}, and every Bash command must \`cd ${worktreeAbs}\` first. A permission guard hard-denies any Write/Edit outside it. Never touch the main checkout (${store.repoRoot}) or another agent's worktree slot.\n` +
         (mission.kind === 'survey'
           ? `- Scope — what you investigate (read-only; reserves nothing): ${mission.scope.join(', ')}\n\n`
@@ -442,12 +410,15 @@ export class TowerSpawnTool implements ITowerSpawnTool {
       );
     }
     const target = reviewTarget ?? '';
-    const author = state.missions.find((m) => m.branch === target)?.owner;
+    const targetMission = state.missions.find((m) => m.branch === target);
+    const author = targetMission?.owner;
+    const reviewBase =
+      targetMission !== undefined ? await store.diffBase(state, targetMission) : state.base;
     return (
       `You are "${args.name}", a tower reviewer agent in a multi-agent workspace.\n\n` +
       `# Your assignment\n` +
-      `Review branch "${target}" against base "${state.base}".\n` +
-      `- Work read-only in the main checkout (${store.repoRoot}): \`git diff ${state.base}...${target}\`, \`git log ${state.base}..${target}\`, and read files as needed.\n` +
+      `Review branch "${target}" against base "${reviewBase}".\n` +
+      `- Work read-only in the main checkout (${store.repoRoot}): \`git diff ${reviewBase}...${target}\`, \`git log ${reviewBase}..${target}\`, and read files as needed.\n` +
       '- Do NOT modify any code, and never create or edit files under `.tower/` by hand — protocol artifacts go through the tower tools.\n\n' +
       `# Review checklist (in priority order)\n` +
       '1. Security\n2. Data integrity\n3. Performance\n4. Error handling\n5. Code quality\n\n' +
@@ -461,4 +432,3 @@ export class TowerSpawnTool implements ITowerSpawnTool {
     );
   }
 }
-

@@ -1,15 +1,3 @@
-/**
- * `kosong/contract` domain — wire message shapes and their pure helpers.
- *
- * `Message` / `ContentPart` / `ToolCall` are the provider-agnostic wire
- * content every protocol base encodes from and decodes into. The helpers
- * cover the whole lifecycle: construction (`create*Message`), inspection
- * (`is*` / `extractText`), and stream merge (`mergeInPlace` folds streamed
- * deltas into the pending part).
- *
- * Pure types and pure functions only — no other domain, no I/O, no SDKs.
- */
-
 import type { Tool } from './tool';
 
 export type Role = 'system' | 'user' | 'assistant' | 'tool';
@@ -59,7 +47,6 @@ export interface ToolCallPart {
 
 export type StreamedMessagePart = ContentPart | ToolCall | ToolCallPart;
 
-/** Opaque provider-native context that only its originating wire protocol may encode. */
 export interface ProviderState {
   readonly protocol: string;
   readonly items: readonly unknown[];

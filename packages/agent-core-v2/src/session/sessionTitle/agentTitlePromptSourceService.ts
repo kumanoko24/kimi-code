@@ -1,20 +1,3 @@
-/**
- * `sessionTitle` domain (L6) — `IAgentTitlePromptSource` implementation.
- *
- * Reads the first active natural-language prompts from the live `contextMemory`
- * window, merging the `prompt` queue so submissions waiting behind an active
- * turn are visible, and projects the turn excerpts behind the `first_turn` /
- * `digest` title sources: assistant segments keep only the final natural
- * language text of the turn (tool calls, thinking, and media parts never
- * contribute; the shared metadata sanitizer redacts secrets and long
- * base64-looking runs; rendered skill blocks bundled into a prompt's
- * content are excluded, so titles reflect the caller's own text). The
- * window may be post-compaction — acceptable for
- * title generation: compaction keeps the head user messages, and a title
- * derived from the surviving tail is a fine degradation. Bound at Agent
- * scope.
- */
-
 import { ScopeActivation, registerScopedService } from '#/_base/di/scope';
 import { LifecycleScope } from '#/app/scopes';
 import { IAgentContextMemoryService } from '#/agent/contextMemory/contextMemory';
@@ -29,6 +12,7 @@ import type { ContentPart } from '#/kosong/contract/message';
 import {
   IAgentTitlePromptSource,
   type TitleDigestExcerpt,
+  type TitleDigestTurn,
   type TitleTurnExcerpt,
 } from './agentTitlePromptSource';
 
@@ -75,24 +59,27 @@ export class AgentTitlePromptSourceService implements IAgentTitlePromptSource {
 
   async digestExcerpt(): Promise<TitleDigestExcerpt> {
     const all = this.combinedMessages();
-    const firstUserIndex = all.findIndex(isNaturalLanguagePrompt);
-    if (firstUserIndex < 0) return {};
-    let lastUserIndex = -1;
-    for (let index = all.length - 1; index >= 0; index--) {
-      if (isNaturalLanguagePrompt(all[index]!)) {
-        lastUserIndex = index;
-        break;
+    const seenMessageIds = new Set<string>();
+    const userIndexes: number[] = [];
+    for (let index = 0; index < all.length; index++) {
+      const message = all[index]!;
+      if (!isNaturalLanguagePrompt(message)) continue;
+      if (message.id !== undefined) {
+        if (seenMessageIds.has(message.id)) continue;
+        seenMessageIds.add(message.id);
       }
+      userIndexes.push(index);
     }
-    const firstUser = promptMetadataTextFromUserMessage(all[firstUserIndex]!);
-    const lastUser =
-      lastUserIndex > firstUserIndex
-        ? promptMetadataTextFromUserMessage(all[lastUserIndex]!)
-        : undefined;
-    const assistant =
-      finalAssistantText(all.slice(lastUserIndex + 1)) ??
-      finalAssistantText(all.slice(firstUserIndex + 1));
-    return { firstUser, lastUser, assistant };
+    const turns: TitleDigestTurn[] = [];
+    for (let i = 0; i < userIndexes.length; i++) {
+      const userIndex = userIndexes[i]!;
+      const user = promptMetadataTextFromUserMessage(all[userIndex]!);
+      if (user === undefined) continue;
+      const spanEnd = i + 1 < userIndexes.length ? userIndexes[i + 1]! : all.length;
+      const assistant = finalAssistantText(all.slice(userIndex + 1, spanEnd));
+      turns.push({ user, assistant });
+    }
+    return { turns };
   }
 
   private combinedMessages(): ContextMessage[] {

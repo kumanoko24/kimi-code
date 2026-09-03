@@ -1,22 +1,3 @@
-/**
- * `bootstrap` domain — frozen startup snapshot and composition root.
- *
- * Defines the `IBootstrapService`, the snapshot of the world the process runs
- * in, resolved once at startup and frozen for the process: observed host facts
- * (`platform`, `arch`, `cwd`, `osHomeDir`, `getEnv`, `clientIdentity`), the
- * app path layout (`homeDir`, `configPath`, …), and the host's process-level
- * invocation arguments (`args` — mirroring VS Code's `NativeParsedArgs`
- * carried on the environment service: the host states them once in
- * `BootstrapInput`; downstream services read them here instead of through
- * per-domain runtime-options services). `resolveBootstrapOptions` is
- * the single place that reads `process.env` / `os.homedir()` / invocation
- * input to resolve the snapshot; everything downstream reads from
- * `IBootstrapService` instead of touching `process` directly. Bound at App
- * scope. Also seeds the `IFileSystemStorageService` with a `FileStorageService`
- * rooted at `homeDir` so the byte layer (and every Store above it) persists
- * to disk.
- */
-
 import { mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 
@@ -31,8 +12,8 @@ import {
   IFileSystemStorageService,
 } from '#/persistence/interface/storage';
 import { FileStorageService } from '#/persistence/backends/node-fs/fileStorageService';
-import { FileSkillDiscovery } from '#/app/skillCatalog/fileSkillDiscovery';
-import { ISkillDiscovery } from '#/app/skillCatalog/skillDiscovery';
+import { FileSkillDiscovery } from '#/features/skill/catalog/fileSkillDiscovery';
+import { ISkillDiscovery } from '#/features/skill/catalog/skillDiscovery';
 
 export interface HostArgs {
   readonly agentFiles?: readonly string[];
@@ -40,6 +21,7 @@ export interface HostArgs {
   readonly requestHeaders: Readonly<Record<string, string>>;
   readonly displayName?: string;
   readonly replyStyleGuide?: string;
+  readonly nonInteractive?: boolean;
 }
 
 export interface HostArgsInput {
@@ -48,6 +30,7 @@ export interface HostArgsInput {
   readonly requestHeaders?: Readonly<Record<string, string>>;
   readonly displayName?: string;
   readonly replyStyleGuide?: string;
+  readonly nonInteractive?: boolean;
 }
 
 export function resolveHostArgs(input: HostArgsInput | undefined): HostArgs {
@@ -57,6 +40,7 @@ export function resolveHostArgs(input: HostArgsInput | undefined): HostArgs {
     requestHeaders: input?.requestHeaders ?? {},
     displayName: input?.displayName,
     replyStyleGuide: input?.replyStyleGuide,
+    nonInteractive: input?.nonInteractive,
   };
 }
 
@@ -76,13 +60,9 @@ export interface IBootstrapOptions {
 }
 
 export interface SessionStorageRoot {
-  /** Absolute Kimi home owning this session tree. */
   readonly homeDir: string;
-  /** Storage scope addressing the owning home from the runtime home. */
   readonly homeScope: string;
-  /** Absolute directory containing workspace session buckets. */
   readonly sessionsDir: string;
-  /** Storage scope addressing the sessions directory from the runtime home. */
   readonly sessionsScope: string;
 }
 
@@ -96,8 +76,7 @@ export type PersistenceScopeName =
   | 'store'
   | 'logs'
   | 'cache'
-  | 'credentials'
-  | 'cron';
+  | 'credentials';
 
 export interface IBootstrapService {
   readonly _serviceBrand: undefined;
@@ -107,14 +86,11 @@ export interface IBootstrapService {
   readonly cwd: string;
   readonly osHomeDir: string;
   readonly homeDir: string;
-  /** Home used for OAuth credential IO. */
   readonly authHomeDir: string;
-  /** Explicit login/logout must not mutate credentials borrowed from another home. */
   readonly authCredentialsReadOnly: boolean;
   readonly configPath: string;
   readonly clientIdentity: KimiHostIdentity;
   readonly args: HostArgs;
-  /** Primary session root first, followed by read/resume fallbacks. */
   readonly sessionStorageRoots: readonly SessionStorageRoot[];
   readonly sessionsDir: string;
   readonly blobsDir: string;
@@ -131,9 +107,7 @@ export const IBootstrapService: ServiceIdentifier<IBootstrapService> =
 
 export interface BootstrapInput {
   readonly homeDir?: string;
-  /** OAuth credential home; defaults to `homeDir`. */
   readonly authHomeDir?: string;
-  /** Primary session home; defaults to `homeDir`. A distinct runtime home remains a fallback. */
   readonly sessionHomeDir?: string;
   readonly configPath?: string;
   readonly env?: NodeJS.ProcessEnv;

@@ -1,5 +1,3 @@
-/** Experimental gate for provider-native Responses compaction. */
-
 import { type FlagDefinitionInput, registerFlagDefinition } from '#/app/flag/flagRegistry';
 
 export const OPENAI_RESPONSES_COMPACTION_FLAG_ID = 'openai-responses-compaction';

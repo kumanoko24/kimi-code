@@ -1,14 +1,3 @@
-/**
- * `gateway` domain — `IRestGateway` / `IWSGateway` implementations.
- *
- * Owns the REST/WS entry points; resolves sessions through the live workspace
- * handler registry and agents through the agent lifecycle, drives turns, and
- * flushes logs. Bound at App scope.
- *
- * WS event fan-out (sequencing, journaling, replay, per-connection dispatch)
- * is a transport concern of the edge server, not of this module.
- */
-
 import { LifecycleScope } from '#/app/scopes';
 
 import {
@@ -41,7 +30,7 @@ export class RestGateway implements IRestGateway {
       });
     }
     const agents = session.accessor.get(IAgentLifecycleService);
-    const agent = agents.get(agentId);
+    const agent = agents.handleOf(agentId);
     if (agent === undefined) {
       throw new Error2(ErrorCodes.AGENT_NOT_FOUND, `unknown agent '${agentId}'`, {
         details: { agentId, sessionId },

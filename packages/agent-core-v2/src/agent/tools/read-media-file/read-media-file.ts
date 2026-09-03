@@ -1,13 +1,3 @@
-/**
- * `tools` domain — `ReadMediaFileTool` contract.
- *
- * Public contract of the `ReadMediaFile` tool: the input zod schema the
- * model-facing parameters are derived from, the tool-owned size constants,
- * and the `VideoUploader` channel type for the provider's upload hook. This
- * tool has no DI decorator — it is a deliberate exception to the
- * `registerAgentToolService` contribution table.
- */
-
 import { z } from 'zod';
 
 import type { VideoURLPart } from '#/kosong/contract/message';
@@ -35,7 +25,6 @@ export interface VideoAnalysisResult {
 }
 
 export type VideoAnalyzer = (input: VideoAnalysisInput) => Promise<VideoAnalysisResult>;
-
 
 export const ReadMediaFileInputSchema = z.object({
   path: z
@@ -71,7 +60,7 @@ export const ReadMediaFileInputSchema = z.object({
     .min(1)
     .optional()
     .describe(
-      'For video files, the question to answer about the video. Include the user\'s actual intent; ' +
+      "For video files, the question to answer about the video. Include the user's actual intent; " +
         'when omitted, the video is described generally.',
     ),
 });

@@ -1,19 +1,19 @@
-/**
- * `tools` domain — `ITowerInitTool` contract (the `TowerInit` tool).
- *
- * Public contract of the tower workspace initializer: creates the `.tower/`
- * workspace, enters tower mode, and activates the rest of the tower tool
- * set. Exports the model-facing `TowerInitToolInputSchema` /
- * `TowerInitToolInput` and the `ITowerInitTool` DI decorator. Bound at Agent
- * scope.
- */
-
 import { z } from 'zod';
 
 import { createDecorator } from '#/_base/di/instantiation';
 import { type AgentTool } from '#/tool/toolContract';
 
-export const TowerInitToolInputSchema = z.object({}).strict();
+export const TowerInitToolInputSchema = z
+  .object({
+    base: z
+      .string()
+      .min(1)
+      .optional()
+      .describe(
+        'Local branch that missions fork from and merge back into (e.g. "develop"). Defaults to the branch currently checked out in the main worktree. Remote-tracking refs (e.g. "origin/main") and tags are not accepted — create a local branch first.',
+      ),
+  })
+  .strict();
 
 export type TowerInitToolInput = z.infer<typeof TowerInitToolInputSchema>;
 

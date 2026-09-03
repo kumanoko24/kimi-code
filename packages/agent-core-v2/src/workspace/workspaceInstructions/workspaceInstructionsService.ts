@@ -1,33 +1,14 @@
-/**
- * `workspaceInstructions` domain — `IWorkspaceInstructionsService`
- * implementation.
- *
- * Loads the workspace root's AGENTS.md hierarchy at construction through the
- * `profile` domain's pure loader (over the os `hostFs`, the host home dir,
- * and the `bootstrap` brand dir), then watches the loader's probe set
- * (`agentsMdWatchRoots` — brand / user-generic / project-root→leaf chain,
- * each plan root watched recursively and pruned to its candidates so files
- * created later inside not-yet-existing directories are still caught)
- * through `hostFsWatch` and reloads debounced; the change event fires only
- * when the combined content or warning actually changed. The snapshot is shared by every session of
- * the handler through the `ISessionInstructionsProvider` seed
- * (`sessionProvider()`), a live read view over this service. The plain-data
- * state (`current`) is registered into `workspaceState`
- * (`IWorkspaceStateService`) and read/written through it. Bound at
- * Workspace scope.
- */
-
 import { Disposable } from '#/_base/di/lifecycle';
 import { Emitter, type Event } from '#/_base/event';
 import { ILogService } from '#/_base/log/log';
-import { defineState } from '#/_base/state/stateRegistry';
+import { defineState } from '#/state/state';
 import { TimeoutTimer } from '#/_base/utils/timer';
 import { subtreeWatchFilter } from '#/_base/utils/paths';
 import { agentsMdWatchRoots, loadAgentsMdForRoots } from '#/agent/profile/context';
 import { IBootstrapService } from '#/app/bootstrap/bootstrap';
 import { IHostEnvironment, type HostEnvironmentInfo } from '#/os/interface/hostEnvironment';
 import { IHostFileSystem } from '#/os/interface/hostFileSystem';
-import { IHostFsWatchService } from '#/os/interface/hostFsWatch';
+import { IHostFsWatchService, type HostFsChange } from '#/os/interface/hostFsWatch';
 import type { ISessionInstructionsProvider } from '#/session/sessionInstructions/instructionsProvider';
 import { IWorkspaceStateService } from '#/workspace/state/workspaceState';
 import { IWorkspaceContext } from '#/workspace/workspaceContext/workspaceContext';
@@ -51,10 +32,12 @@ export class WorkspaceInstructionsService
   declare readonly _serviceBrand: undefined;
 
   readonly ready: Promise<void>;
-  private readonly onDidChangeEmitter = this._register(new Emitter<void>());
-  readonly onDidChange: Event<void> = this.onDidChangeEmitter.event;
+  private readonly onDidChangeEmitter = this._register(new Emitter<readonly HostFsChange[]>());
+  readonly onDidChange: Event<readonly HostFsChange[]> = this.onDidChangeEmitter.event;
   private readonly watchDebounce = this._register(new TimeoutTimer());
   private reloadTail: Promise<void> = Promise.resolve();
+  private loaded = false;
+  private readonly pendingChanges = new Map<string, HostFsChange>();
 
   constructor(
     @IWorkspaceContext private readonly workspace: IWorkspaceContext,
@@ -66,7 +49,7 @@ export class WorkspaceInstructionsService
     @IWorkspaceStateService private readonly states: IWorkspaceStateService,
   ) {
     super();
-    this.states.register(workspaceInstructionsCurrentKey);
+    this.states.contributeState(workspaceInstructionsCurrentKey);
     this.ready = this.reload();
     void this.watchCandidateFiles();
   }
@@ -99,8 +82,12 @@ export class WorkspaceInstructionsService
         next.agentsMd !== this.current.agentsMd ||
         next.agentsMdWarning !== this.current.agentsMdWarning;
       this.current = next;
-      if (changed) {
-        this.onDidChangeEmitter.fire();
+      const changes = [...this.pendingChanges.values()];
+      this.pendingChanges.clear();
+      const loaded = this.loaded;
+      this.loaded = true;
+      if (changed && loaded) {
+        this.onDidChangeEmitter.fire(changes);
       }
     });
     this.reloadTail = tail;
@@ -140,7 +127,8 @@ export class WorkspaceInstructionsService
         });
         this._register(handle);
         this._register(
-          handle.onDidChange(() => {
+          handle.onDidChange((change) => {
+            this.pendingChanges.set(change.path, change);
             this.watchDebounce.cancelAndSet(() => {
               void this.reload().catch((error) => {
                 this.log.warn(`AGENTS.md reload failed: ${String(error)}`);

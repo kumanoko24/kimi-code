@@ -13,6 +13,7 @@ import {
   applyManagedKimiCodeLogoutConfig,
   KIMI_CODE_PROVIDER_NAME,
   KimiOAuthToolkit,
+  kimiRegionLoginHosts,
   resolveKimiCodeLoginAuth,
   resolveKimiCodeRuntimeAuth,
   type AuthManagedUsageResult,
@@ -23,6 +24,7 @@ import {
   type FetchSubmitFeedbackResult,
   type KimiHostIdentity,
   type KimiOAuthLoginOptions,
+  type KimiRegion,
   type ManagedKimiConfigShape,
   type OAuthRefreshOutcome,
 } from '@moonshot-ai/kimi-code-oauth';
@@ -73,7 +75,16 @@ export type KimiAuthCreateFeedbackUploadUrlResult =
   | KimiAuthCreateFeedbackUploadUrlOk
   | FetchFeedbackUploadError;
 
-export type KimiAuthLoginOptions = Omit<KimiOAuthLoginOptions, 'provisionConfig'>;
+export type KimiAuthLoginOptions = Omit<KimiOAuthLoginOptions, 'provisionConfig'> & {
+  /**
+   * Explicit region choice from the login UI ('mainland-cn' / 'global'). Maps
+   * to the region profile's OAuth/API hosts — including for 'mainland-cn', so
+   * switching back overrides a persisted global login. Yields to
+   * `KIMI_CODE_OAUTH_HOST` / `KIMI_CODE_BASE_URL` env overrides and to
+   * explicit `oauthHost` / `baseUrl` options.
+   */
+  readonly region?: KimiRegion;
+};
 
 export interface KimiAuthLoginResult {
   readonly providerName: string;
@@ -91,10 +102,10 @@ export interface KimiAuthLogoutResult {
 export interface KimiAuthFacadeOptions {
   readonly homeDir: string;
   readonly configPath: string;
-  readonly credentialsReadOnly?: boolean;
   readonly identity?: KimiHostIdentity | undefined;
   readonly onConfigUpdated?: ((config: KimiConfig) => void) | undefined;
   readonly onRefresh?: ((outcome: OAuthRefreshOutcome) => void) | undefined;
+  readonly credentialsReadOnly?: boolean;
 }
 
 type SDKManagedConfig = KimiConfig & ManagedKimiConfigShape;
@@ -130,18 +141,20 @@ export class KimiAuthFacade {
     options: KimiAuthLoginOptions = {},
   ): Promise<KimiAuthLoginResult> {
     this.assertCredentialsWritable();
+    const { region, ...loginOptions } = options;
+    const regionHosts = region === undefined ? undefined : kimiRegionLoginHosts(region);
     const auth = this.resolveManagedAuth(providerName);
     const loginAuth = resolveKimiCodeLoginAuth({
       configuredBaseUrl: auth.baseUrl,
       configuredOAuthRef: auth.oauthRef,
-      requestedBaseUrl: options.baseUrl,
-      requestedOAuthHost: options.oauthHost,
+      requestedBaseUrl: loginOptions.baseUrl ?? regionHosts?.baseUrl,
+      requestedOAuthHost: loginOptions.oauthHost ?? regionHosts?.oauthHost,
     });
     const result = await this.toolkit.login(providerName, {
-      ...options,
+      ...loginOptions,
       baseUrl: loginAuth.baseUrl,
       oauthHost: loginAuth.oauthHost,
-      oauthRef: options.oauthRef ?? loginAuth.oauthRef,
+      oauthRef: loginOptions.oauthRef ?? loginAuth.oauthRef,
       provisionConfig: true,
     });
     if (result.provision === undefined) {
@@ -170,6 +183,14 @@ export class KimiAuthFacade {
       providerName: result.providerName,
       ok: result.ok,
     };
+  }
+
+  private assertCredentialsWritable(): void {
+    if (this.options.credentialsReadOnly !== true) return;
+    throw new KimiError(
+      ErrorCodes.AUTH_CREDENTIALS_READ_ONLY,
+      'This client reads credentials from another Kimi Code home and cannot modify them.',
+    );
   }
 
   async getManagedUsage(providerName?: string | undefined): Promise<AuthManagedUsageResult> {
@@ -297,14 +318,6 @@ export class KimiAuthFacade {
       oauthRef: provider?.oauth,
       baseUrl: provider?.baseUrl,
     };
-  }
-
-  private assertCredentialsWritable(): void {
-    if (this.options.credentialsReadOnly !== true) return;
-    throw new KimiError(
-      ErrorCodes.AUTH_CREDENTIALS_READ_ONLY,
-      'This client reads credentials from another Kimi Code home and cannot modify them.',
-    );
   }
 
   private resolveRuntimeManagedAuth(providerName?: string | undefined): {

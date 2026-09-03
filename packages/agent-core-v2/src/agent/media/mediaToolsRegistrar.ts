@@ -1,93 +1,55 @@
-/**
- * Media tool production registration — the Agent-scope service that keeps
- * `ReadMediaFile` in the tool registry in sync with the bound model.
- *
- * Media tools cannot ride the module-level `registerAgentToolService(...)`
- * contribution table: its activation runs when the Agent is created, and at
- * that point no model is bound yet — the capabilities are still
- * `UNKNOWN_CAPABILITY`, so a capability gate would permanently skip the
- * tool. Registration instead re-runs whenever the resolved model changes:
- * every profile/model update publishes `agent.status.updated`, and this
- * service re-invokes {@link registerMediaTools} when the model alias or its
- * media capabilities differ from what it last registered (rebinding the
- * video uploader to the new model, and dropping the tool when the model
- * loses media input). The `inlineVideoSupported` flag rides the same
- * refresh: it is derived from the model's protocol because only the OpenAI
- * family drops inline video on the wire — every other protocol that
- * converts `video_url` takes the inline fallback when no upload hook
- * exists.
- *
- * The plain-data state (`registeredKey`) is registered into `agentState`
- * (`IAgentStateService`) and read/written through it; `registration` stays an
- * instance field (the live `IDisposable` tool-registration handle, not plain
- * data).
- *
- * Agent scope creation instantiates this service before any `opts.binding`
- * bind runs, so the first `agent.status.updated` is always observed.
- */
+import { toDisposable, type IDisposable } from '#/_base/di/lifecycle';
+import { Service } from '#/_base/di/service';
+import { LifecycleScope } from '#/app/scopes';
+import { ScopeActivation, registerScopedService } from '#/_base/di/scope';
+import { defineState } from '#/state/state';
+import { IAgentStateService } from '#/agent/state/agentState';
+import { IEventBus } from '#/app/event/eventBus';
+import { AgentStatusUpdated } from '#/agent/usage/usageEvents';
+import { ITelemetryService } from '#/app/telemetry/telemetry';
+import { IFlagService } from '#/app/flag/flag';
+import { IModelCatalog, type Model } from '#/kosong/model/catalog';
+import { type ModelRequester } from '#/kosong/model/modelRequester';
+import { IProviderService } from '#/kosong/provider/provider';
+import { IAgentRuntimeService } from '#/agent/runtimeBinding/agentRuntime';
+import { ISessionSkillCatalog } from '#/features/skill/session/skillCatalog';
+import { ISessionWorkspaceContext } from '#/session/workspaceContext/workspaceContext';
+import { IAgentProfileService } from '#/agent/profile/profile';
+import { IAgentToolRegistryService } from '#/agent/toolRegistry/toolRegistry';
+import { extendWorkspaceWithSkillRoots } from '#/tool/path-access';
 
-import { toDisposable, type IDisposable } from "#/_base/di/lifecycle";
-import { Service } from "#/_base/di/service";
-import { LifecycleScope } from "#/app/scopes";
-import { ScopeActivation, registerScopedService } from "#/_base/di/scope";
-import { defineState } from "#/_base/state/stateRegistry";
-import { IAgentStateService } from "#/agent/state/agentState";
-import { IEventBus } from "#/app/event/eventBus";
-import { ITelemetryService } from "#/app/telemetry/telemetry";
-import { IFlagService } from "#/app/flag/flag";
-import { IModelCatalog, type Model } from "#/kosong/model/catalog";
-import { type ModelRequester } from "#/kosong/model/modelRequester";
-import { IProviderService } from "#/kosong/provider/provider";
-import { IAgentRuntimeService } from "#/agent/runtimeBinding/agentRuntime";
-import { ISessionSkillCatalog } from "#/session/sessionSkillCatalog/skillCatalog";
-import { ISessionWorkspaceContext } from "#/session/workspaceContext/workspaceContext";
-import { IAgentProfileService } from "#/agent/profile/profile";
-import { IAgentToolRegistryService } from "#/agent/toolRegistry/toolRegistry";
-import { extendWorkspaceWithSkillRoots } from "#/tool/path-access";
-
-import { IAgentMediaToolsRegistrar } from "./mediaTools";
-import { VIDEO_MEDIA_FALLBACK_FLAG_ID } from "./flag";
-import {
-  createVideoAnalyzer,
-  createVideoUploader,
-  registerMediaTools,
-} from "./registerMediaTools";
+import { IAgentMediaToolsRegistrar } from './mediaTools';
+import { VIDEO_MEDIA_FALLBACK_FLAG_ID } from './flag';
+import { createVideoAnalyzer, createVideoUploader, registerMediaTools } from './registerMediaTools';
 
 export const mediaRegisteredKeyKey = defineState<string | undefined>(
-  "media.registeredKey",
+  'media.registeredKey',
   () => undefined as string | undefined,
 );
 
-export class AgentMediaToolsRegistrar
-  extends Service
-  implements IAgentMediaToolsRegistrar
-{
+export class AgentMediaToolsRegistrar extends Service implements IAgentMediaToolsRegistrar {
   declare readonly _serviceBrand: undefined;
 
   private registration: IDisposable | undefined;
 
   constructor(
-    @IAgentToolRegistryService
-    private readonly toolRegistry: IAgentToolRegistryService,
+    @IAgentToolRegistryService private readonly toolRegistry: IAgentToolRegistryService,
     @IAgentProfileService private readonly profile: IAgentProfileService,
     @IModelCatalog private readonly modelCatalog: IModelCatalog,
     @IProviderService private readonly providerService: IProviderService,
     @IFlagService private readonly flags: IFlagService,
     @IEventBus eventBus: IEventBus,
     @IAgentRuntimeService private readonly runtime: IAgentRuntimeService,
-    @ISessionWorkspaceContext
-    private readonly workspaceCtx: ISessionWorkspaceContext,
+    @ISessionWorkspaceContext private readonly workspaceCtx: ISessionWorkspaceContext,
     @ITelemetryService private readonly telemetry: ITelemetryService,
     @IAgentStateService private readonly states: IAgentStateService,
     @ISessionSkillCatalog private readonly skillCatalog?: ISessionSkillCatalog,
   ) {
     super();
-    this.states.register(mediaRegisteredKeyKey);
+    this.states.contributeState(mediaRegisteredKeyKey);
     this.refresh();
-    this._register(
-      eventBus.subscribe("agent.status.updated", () => this.refresh()),
-    );
-    this._register(providerService.onDidChangeProviders(() => this.refresh()));
+    this._register(eventBus.subscribe(AgentStatusUpdated, () => this.refresh()));
+    this._register(this.providerService.onDidChangeProviders(() => this.refresh()));
     this._register(this.runtime.onDidChange(() => this.refresh()));
     this._register(toDisposable(() => this.registration?.dispose()));
   }
@@ -104,13 +66,13 @@ export class AgentMediaToolsRegistrar
     const capabilities = this.profile.getModelCapabilities();
     const fallback = this.fallbackConfig();
     const modelAlias = this.profile.getModel();
-    if (!this.runtime.isAvailable(["fs"])) {
+    if (!this.runtime.isAvailable(['fs'])) {
       const key = [
         modelAlias,
         String(capabilities.image_in),
         String(capabilities.video_in),
-        "runtime-unavailable",
-      ].join("|");
+        'runtime-unavailable',
+      ].join('|');
       if (key === this.registeredKey) return;
       this.registeredKey = key;
       this.registration?.dispose();
@@ -122,18 +84,18 @@ export class AgentMediaToolsRegistrar
       inspected.identity.workspaceId,
       inspected.identity.runtimeId,
       inspected.identity.generation,
-    ].join("|");
+    ].join('|');
     const key = [
       modelAlias,
       String(capabilities.image_in),
       String(capabilities.video_in),
-      fallback?.model ?? "",
-      fallback?.effort ?? "",
+      fallback?.model ?? '',
+      fallback?.effort ?? '',
       identityKey,
       inspected.status,
       inspected.environment.pathClass,
-      String(inspected.capabilities.has("fs")),
-    ].join("|");
+      String(inspected.capabilities.has('fs')),
+    ].join('|');
     if (key === this.registeredKey) return;
     this.registeredKey = key;
     this.registration?.dispose();
@@ -143,14 +105,17 @@ export class AgentMediaToolsRegistrar
     const pathClass = inspected.environment.pathClass;
     let requester: ModelRequester | undefined;
     let model: Model | undefined;
-    if (modelAlias !== "") {
-      requester = this.modelCatalog.getRequester(modelAlias);
-      model = requester.model;
+    if (modelAlias !== '') {
+      try {
+        requester = this.modelCatalog.getRequester(modelAlias);
+        model = requester.model;
+      } catch {
+        requester = undefined;
+        model = undefined;
+      }
     }
     const fallbackRequester =
-      fallback === undefined
-        ? undefined
-        : this.modelCatalog.getRequester(fallback.model);
+      fallback === undefined ? undefined : this.modelCatalog.getRequester(fallback.model);
     this.registration = registerMediaTools(this.toolRegistry, {
       runtime,
       workspace: {
@@ -159,10 +124,7 @@ export class AgentMediaToolsRegistrar
         },
         get additionalDirs() {
           return extendWorkspaceWithSkillRoots(
-            {
-              workspaceDir: workspaceCtx.workDir,
-              additionalDirs: workspaceCtx.additionalDirs,
-            },
+            { workspaceDir: workspaceCtx.workDir, additionalDirs: workspaceCtx.additionalDirs },
             skillCatalog?.catalog.getSkillRoots() ?? [],
             pathClass,
           ).additionalDirs;
@@ -177,34 +139,29 @@ export class AgentMediaToolsRegistrar
           protocol: model?.protocol,
         },
       }),
-      inlineVideoSupported:
-        model?.protocol !== "openai" && model?.protocol !== "openai_responses",
+      inlineVideoSupported: model?.protocol !== 'openai' && model?.protocol !== 'openai_responses',
       videoAnalyzer:
         fallback === undefined
           ? undefined
-          : createVideoAnalyzer(
-              fallbackRequester,
-              fallback.model,
-              fallback.effort,
-            ),
+          : createVideoAnalyzer(fallbackRequester, fallback.model, fallback.effort),
       telemetry: this.telemetry,
     });
   }
 
-  private fallbackConfig():
-    { readonly model: string; readonly effort: string } | undefined {
+  private fallbackConfig(): { readonly model: string; readonly effort: string } | undefined {
     if (!this.flags.enabled(VIDEO_MEDIA_FALLBACK_FLAG_ID)) return undefined;
     const modelAlias = this.profile.getModel();
-    if (modelAlias === "") return undefined;
-    const model = this.modelCatalog.getRequester(modelAlias).model;
+    if (modelAlias === '') return undefined;
+    let model: Model;
+    try {
+      model = this.modelCatalog.getRequester(modelAlias).model;
+    } catch {
+      return undefined;
+    }
     const provider = this.providerService.get(model.providerName);
     const fallbackModel = provider?.videoFallbackModel;
-    if (fallbackModel === undefined || fallbackModel.length === 0)
-      return undefined;
-    return {
-      model: fallbackModel,
-      effort: provider?.videoFallbackEffort ?? "high",
-    };
+    if (fallbackModel === undefined || fallbackModel.length === 0) return undefined;
+    return { model: fallbackModel, effort: provider?.videoFallbackEffort ?? 'high' };
   }
 }
 
@@ -213,5 +170,5 @@ registerScopedService(
   IAgentMediaToolsRegistrar,
   AgentMediaToolsRegistrar,
   ScopeActivation.OnScopeCreated,
-  "media",
+  'media',
 );

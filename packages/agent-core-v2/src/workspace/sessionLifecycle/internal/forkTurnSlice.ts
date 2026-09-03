@@ -1,20 +1,5 @@
-/**
- * `sessionLifecycle` domain — fork-time turn truncation over raw wire records.
- *
- * Ports the v1 engine's `forkSession(turnIndex)` slicing onto the flat
- * `WireRecord` shape: a user-visible turn boundary is a
- * `context.append_message` user record with an interactive origin (plain user
- * input, a user-slash skill / plugin command, or a shell-command input line),
- * the retained main prefix runs through the addressed turn inclusive, and
- * `turn.prompt` / `turn.steer` inputs inside the prefix survive only when
- * matched (origin kind, then content exact-then-fuzzy) to a retained boundary.
- * Subagent wires time-cut at the retained main prefix's latest record time,
- * and the fork's `lastPrompt` re-derives from the addressed turn's record
- * through the `prompt` domain's shared metadata-text normalization. Pure
- * functions over already-read records — own no scoped state.
- */
-
 import { Error2, ErrorCodes } from '#/errors';
+import { FILE_HISTORY_RECORD_PREFIX } from '#/features/fileHistory/fileHistoryOps';
 import type { ContentPart } from '#/kosong/contract/message';
 import {
   promptMetadataTextFromContentParts,
@@ -61,7 +46,9 @@ export function sliceMainRecordsAtTurn(
   const retained = records
     .slice(0, end)
     .filter(
-      (record, index) => !isUserVisibleTurnInputRecord(record) || retainedTurnInputs.has(index),
+      (record, index) =>
+        !record.type.startsWith(FILE_HISTORY_RECORD_PREFIX) &&
+        (!isUserVisibleTurnInputRecord(record) || retainedTurnInputs.has(index)),
     );
   const cutoffTimes = retained
     .map(recordTime)
