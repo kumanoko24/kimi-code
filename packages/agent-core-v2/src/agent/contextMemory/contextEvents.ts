@@ -66,6 +66,9 @@ const contextCompactionBaseShape = {
   droppedCount: z.number().optional(),
   legacyTail: z.boolean().optional(),
   providerState: providerStateSchema.optional(),
+  wireLines: z
+    .object({ start: z.number().int().nonnegative(), end: z.number().int().nonnegative() })
+    .optional(),
 };
 
 const contextApplyCompactionSchema = z.union([

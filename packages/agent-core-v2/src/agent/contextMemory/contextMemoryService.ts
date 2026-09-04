@@ -132,6 +132,7 @@ export class AgentContextMemoryService extends Disposable implements IAgentConte
         keptHeadUserMessageCount: result.keptHeadUserMessageCount,
         droppedCount: result.droppedCount,
         providerState: input.providerState,
+        wireLines: input.wireLines,
       }),
     );
     this.tokenCounting.rebase(this.scopeContext.agentContext, {

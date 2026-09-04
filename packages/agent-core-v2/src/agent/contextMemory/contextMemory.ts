@@ -1,5 +1,6 @@
 import { createDecorator } from "#/_base/di/instantiation";
 import type { ProviderState } from '#/kosong/contract/message';
+import type { WireLineRange } from '#/wire/record';
 
 import type { UndoCut } from './contextOps';
 import type { LoopRecordedEvent } from './loopEventFold';
@@ -17,6 +18,7 @@ export interface ContextCompactionInput {
   readonly keptHeadUserMessageCount?: number;
   readonly droppedCount?: number;
   readonly providerState?: ProviderState;
+  readonly wireLines?: WireLineRange;
 }
 
 export interface ContextCompactionResult {
