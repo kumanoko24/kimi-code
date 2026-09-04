@@ -1,15 +1,15 @@
 # OpenAI Responses and local gateway action ledger
 
-- updated_at: `2026-09-04T07:33:44+08:00`
+- updated_at: `2026-09-04T08:14:56+08:00`
 - objective: retain native OpenAI Responses support while adding isolated `kiminn` provider observability, tmux identity, and managed-Kimi video fallback
-- current milestone: M25 — upstream 0.40.1 sync with isolated kiminn deployment
+- current milestone: M26 — second upstream 0.40.1 sync with isolated kiminn deployment
 - next milestones: none
-- status: PASS (`M1` through `M25` independently PASS)
+- status: PASS (`M1` through `M26` independently PASS)
 - Kimi pre-change commit: `c27a9f`
 - Kimi mechanism commits: `54b21c7cf`, `af2677ca6`
 - gateway pre-change commit: `889bdb5`
 - gateway commits: `4075d67`, `d45deb0`, `b383c5c`
-- live rollback boundary: restore the isolated binary and receipt from `/Users/noelbao/.kiminn/backups/cumi-052e98ec1-20260904-0724/`; canonical Kimi and the localhost-2234 gateway were not mutated
+- live rollback boundary: restore the isolated binary and receipt from `/Users/noelbao/.kiminn/backups/cumi-523d35b54-20260904-080848/`; canonical Kimi and the localhost-2234 gateway were not mutated
 
 ## Invariants
 
@@ -691,6 +691,28 @@ Evidence:
 - isolated config, TUI config, and wrapper hashes stayed `83e076e6…`, `09d7953c…`, and `6729dac0…`. Canonical Kimi stayed byte-identical to the fresh pre-deployment guard: binary SHA-256 `762ee3be…` and config SHA-256 `cda838ff…`;
 - the six existing fork changesets remain one user-visible patch each and require no duplicate merge changeset. `gen-docs` could not run because the upstream tree no longer contains its mandatory `docs/scripts/sync-changelog.mjs`; no fake or manual bilingual sync was substituted;
 - `/Users/noelbao/.kiminn/install-receipt.toml` records source `ecaf55b50`, upstream `052e98ec1`, binary/config hashes, RBV session, split homes, and the rollback directory.
+
+### M26 — second upstream 0.40.1 sync with isolated kiminn deployment (PASS)
+
+Intent:
+
+- reconcile the first M25 result after a fresh terminal review found that `MoonshotAI/main` had advanced from `052e98ec1` to `523d35b54`;
+- integrate the new context-budget, background-question, telemetry, heredoc, print-mode, documentation, and kap-server changes while preserving the fork's native Responses compaction, split homes, observability, media fallback, and exact subagent bindings;
+- rebuild and deploy only isolated `kiminn`, then repeat parent, child, resume, storage, and localhost-2234 RBV.
+
+Recovery boundary: revert merge commit `c745b6f7f` and restore `/Users/noelbao/.kiminn/bin/kimi` plus its receipt from `/Users/noelbao/.kiminn/backups/cumi-523d35b54-20260904-080848/`. Canonical Kimi, isolated configuration/wrapper, credentials, and the gateway require no rollback.
+
+Evidence:
+
+- the fresh second fetch advanced upstream by 11 commits to `523d35b54b25a0b4589388a2b6c8c4261f1ef7db`; merge commit `c745b6f7f1e0c3b4a09ade8e525d04b44e8ac86e` records fork parent `f73993eb4` and that upstream tip. A final fresh fetch immediately before recording this milestone still reported the same upstream tip;
+- 12 textual conflicts were resolved by retaining split auth/session homes alongside upstream telemetry initialization, retaining opaque native Responses provider state plus wire ranges, filtering internal context-budget reminders from native compaction, and combining fork telemetry with upstream ahead-reminder telemetry. The bilingual provider/override/data-location documentation retained fork behavior and accepted upstream's `${now}` agent-template variable;
+- focused gates passed: agent-core-v2 `133/133`, final native-compaction rerun `98/98`, CLI print `15/15`, and Node SDK `48/48`. Root typecheck, root lint with zero errors, bilingual docs build, native SEA build/signature/smoke, and the 23-workspace build all passed; Sherif retained only the two known missing-manifest warnings;
+- the clean full-suite run with four workers passed 1,097 files and 20,081 tests, with three expected failures, 80 skips, and two todos in 200.94 seconds. One earlier run had a single filesystem-watch timeout; that exact file then passed three consecutive isolated runs, `30/30` tests, before the clean full rerun;
+- installed `/Users/noelbao/.kiminn/bin/kimi` reports `0.40.1`, passes ad-hoc signature validation and `kiminn doctor`, and matches the built darwin-arm64 artifact at SHA-256 `30a86c0b952620fd860c36f9486b1402076702f6f74b137aee9633a1cab1bc7c`;
+- installed session `session_21cc4807-fec6-4b69-878a-f8a063c3dd84` returned exact child `CHILD_523D_OK`, exact parent `PARENT_523D_OK CHILD_523D_OK`, and exact resumed `RESUME_523D_OK`. Wire records show three parent requests on OpenAI Responses Sol/xhigh/272000 and one child request on OpenAI Responses Luna/max/272000; both parent turns and the child turn ended `completed`;
+- the session exists only under canonical `~/.kimi-code/sessions`, not isolated `~/.kiminn/sessions`. Gateway telemetry for the same explicit affinity reports idle state, zero in-flight requests, safe account label `codex-atk`, fresh quota, and `4/4` HTTP 200 terminal successes with usage observed for every request; health and readiness passed and the redirect-resolved dashboard returned HTTP 200;
+- isolated config, TUI config, and wrapper hashes stayed `83e076e6…`, `09d7953c…`, and `6729dac0…`. Canonical Kimi stayed byte-identical to the fresh pre-deployment guard at binary SHA-256 `762ee3be…` and config SHA-256 `cda838ff…`;
+- `/Users/noelbao/.kiminn/install-receipt.toml` records source `c745b6f7f`, upstream `523d35b54`, the exact installed binary/config hashes, RBV session, split homes, and rollback directory.
 
 Local recovery:
 
