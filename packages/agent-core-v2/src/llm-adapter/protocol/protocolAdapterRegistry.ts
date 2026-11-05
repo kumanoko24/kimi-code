@@ -36,6 +36,24 @@ import { getProviderDefinition } from '../provider/provider-definition';
 import { IProtocolAdapterRegistry, type Protocol } from './protocol';
 import { getProtocolBase, listProtocolBases, type ProtocolBaseId } from './protocol-base';
 
+const SESSION_ID_PLACEHOLDER = '{session_id}';
+
+function resolveSessionPlaceholders(
+  headers: Record<string, string> | undefined,
+  cacheKey: string | undefined,
+): Record<string, string> | undefined {
+  if (headers === undefined || cacheKey === undefined || cacheKey.length === 0) {
+    return undefined;
+  }
+  const resolved: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    resolved[name] = value.includes(SESSION_ID_PLACEHOLDER)
+      ? value.replaceAll(SESSION_ID_PLACEHOLDER, cacheKey)
+      : value;
+  }
+  return resolved;
+}
+
 interface AdapterRoute {
   readonly requester: CoreLlmRequester<'protocol'>;
   readonly options?: (params: ModelRequestParams | undefined) => unknown;
@@ -214,10 +232,14 @@ export class ProtocolAdapterRegistry implements IProtocolAdapterRegistry {
         };
       }
     }
+    const requestHeaders = mergeHeaders(
+      route.defaultHeaders?.({ model: connection }),
+      connection.defaultHeaders,
+    );
     const endpoint: LlmEndpoint = {
       ...base.endpoint,
       baseUrl: connection.baseUrl,
-      headers: mergeHeaders(route.defaultHeaders?.({ model: connection }), connection.defaultHeaders),
+      headers: resolveSessionPlaceholders(requestHeaders, params?.cacheKey) ?? requestHeaders,
       credentials: {
         resolve: async () => {
           const credential = await model.credentialProvider?.resolve();
