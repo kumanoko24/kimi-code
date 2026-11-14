@@ -124,7 +124,7 @@ Each entry in the `providers` table defines an API provider, keyed by a unique n
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `type` | `string` | Yes | Provider type: `kimi`, `anthropic`, `openai`, `openai_responses`, `google-genai`, `vertexai` |
+| `type` | `string` | Yes | Provider type: `kimi`, `anthropic`, `openai`, `openrouter`, `openai_responses`, `google-genai`, `vertexai` |
 | `api_key` | `string` | No | API key, written in plain text in the config file |
 | `api_key_env` | `string` | No | Name of a shell environment variable to read the API key from instead of storing it in the config file; re-read on every request. Mutually exclusive with `api_key` and `oauth`; an unset or empty variable fails the request with an error naming the variable |
 | `base_url` | `string` | No | API base URL |
@@ -163,6 +163,7 @@ Each entry in the `models` table defines a model alias (the name used in `defaul
 | `base_url` | `string` | No | Per-model endpoint override (written by catalog imports); takes precedence over the provider's `base_url`, only effective together with `protocol` |
 | `display_name` | `string` | No | Name shown in the UI; falls back to `model` when unset |
 | `reasoning_key` | `string` | No | `openai` provider only; set when the gateway returns reasoning content under a non-standard field name (`reasoning_content` and friends are auto-detected) |
+| `openrouter` | `table` | No | OpenRouter reasoning and routing options; see [OpenRouter configuration](./providers.md#openrouter) |
 | `adaptive_thinking` | `boolean` | No | `anthropic` provider only; force adaptive thinking on or off, omit to infer from the model name (Claude ≥ 4.6 uses adaptive) |
 
 When an alias contains `.`, use a quoted key:

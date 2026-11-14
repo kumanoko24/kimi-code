@@ -1,3 +1,4 @@
+import { openRouterRequester } from '#human/llm/builtin/provider/openrouter/index';
 import { BugIndicatingError } from '#/_base/errors/errors';
 import type { ModelCapability as HumanModelCapability } from '#human/llm-requester/capability';
 import type { DefaultHeadersResolver, ProtocolEndpoint } from '#human/llm-requester/connection';
@@ -229,4 +230,15 @@ registerProviderDefinition({
   hostHeaders: 'full',
   requestMetadata: true,
   modelSource: 'oauth-catalog',
+});
+
+registerProviderDefinition({
+  id: 'openrouter',
+  baseProtocol: 'openai',
+  requester: openRouterRequester,
+  endpoint: {
+    apiKeyEnv: 'OPENROUTER_API_KEY',
+    baseUrlEnv: 'OPENROUTER_BASE_URL',
+    defaultBaseUrl: 'https://openrouter.ai/api/v1',
+  },
 });

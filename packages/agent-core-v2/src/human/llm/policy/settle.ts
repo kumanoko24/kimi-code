@@ -23,7 +23,9 @@ import {
 import { clock } from '#/utils/clock';
 
 export function usableOutputOf(message: AssistantMessage): AssistantMessage | null {
-  const drained = message.content.filter((part) => !isVacuousContentPart(part));
+  const drained = message.content.filter((part) =>
+    !isVacuousContentPart(part) && !(part.type === 'think' && part.openRouterReasoning !== undefined),
+  );
   const lastCompleteThink = drained.findLastIndex(
     (part) => part.type === 'think' && part.encrypted !== undefined,
   );

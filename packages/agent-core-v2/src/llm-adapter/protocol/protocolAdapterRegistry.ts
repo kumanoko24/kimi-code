@@ -78,15 +78,16 @@ function routeFor(model: Model): AdapterRoute {
         requester: definition?.requester ?? openAIRequester,
         options: (params) => ({
           extras: samplingExtraParams('openai', params?.sampling),
+          openrouter: model.providerOptions?.openrouter,
           reasoningKey:
-            definition?.requester === undefined ? openAIReasoningKeyFor(model) : undefined,
+            definition?.requester === undefined || model.providerType === 'openrouter' ? openAIReasoningKeyFor(model) : undefined,
           toolMessageConversion:
-            definition?.requester === undefined ? undefined : 'keep_parts',
+            definition?.requester === undefined || model.providerType === 'openrouter' ? undefined : 'keep_parts',
         }),
         endpoint: definition?.endpoint ?? openAIEndpoint,
         defaultHeaders: definition?.defaultHeaders,
         classifyError: definition?.classifyError,
-        providerId: 'openai',
+        providerId: model.providerType === 'openrouter' ? 'openrouter' : 'openai',
       };
     case 'openai_responses':
       return {

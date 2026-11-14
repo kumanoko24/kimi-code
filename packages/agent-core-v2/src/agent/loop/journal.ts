@@ -434,6 +434,7 @@ export class LoopJournal {
           rawId: event.toolCall.rawId,
           name: event.toolCall.name,
           args: toolArguments(assistant, event.toolCall.id),
+          rawArguments: assistant.message.content.some((part) => part.type === 'think' && part.openRouterReasoning !== undefined) ? event.toolCall.arguments : undefined,
           extras: event.toolCall.extras,
           display: event.display,
         });
@@ -573,6 +574,7 @@ export class LoopJournal {
           rawId: toolCall?.rawId,
           name: toolCall?.name ?? toolCallId,
           args: toolArguments(assistant, toolCallId),
+          rawArguments: assistant.message.content.some((part) => part.type === 'think' && part.openRouterReasoning !== undefined) ? toolCall?.arguments : undefined,
           extras: toolCall?.extras,
         });
       }

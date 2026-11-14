@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { OpenRouterOptionsSchema } from '#human/llm/builtin/provider/openrouter/options';
+
 import {
   type ConfigDiagnostic,
   type ConfigStripEnv,
@@ -181,6 +183,7 @@ const ModelBaseSchema = z.object({
   capabilities: z.array(z.string()).optional(),
   displayName: z.string().optional(),
   reasoningKey: z.string().optional(),
+  openrouter: OpenRouterOptionsSchema.optional(),
   adaptiveThinking: z.boolean().optional(),
   betaApi: z.boolean().optional(),
   supportEfforts: z.array(z.string()).optional(),
@@ -301,6 +304,8 @@ export const modelsToToml = (value: unknown, rawSnake: unknown): unknown => {
         merged[camelToSnake(key)] = [...field];
       } else if (key === 'overrides' && isPlainObject(field)) {
         merged['overrides'] = modelOverridesToToml(field, merged['overrides']);
+      } else if (key === 'openrouter' && isPlainObject(field)) {
+        merged['openrouter'] = plainObjectToToml(field, undefined);
       } else if (key === 'upgrade') {
         merged['upgrade'] = isPlainObject(field) ? plainObjectToToml(field, undefined) : undefined;
       } else {

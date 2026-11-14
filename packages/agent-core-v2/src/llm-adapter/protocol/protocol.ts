@@ -14,6 +14,7 @@ export type Protocol = z.infer<typeof ProtocolSchema>;
 
 export interface ProtocolProviderOptions {
   readonly reasoningKey?: string;
+  readonly openrouter?: import('#human/llm/builtin/provider/openrouter/options').OpenRouterOptions;
   readonly defaultMaxTokens?: number;
   readonly supportEfforts?: readonly string[];
   readonly offEffort?: string;

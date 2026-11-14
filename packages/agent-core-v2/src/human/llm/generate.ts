@@ -1,5 +1,5 @@
 import { resolveEndpoint } from '#/llm/endpoint';
-import { isAbortError, toLlmErrorMessage, toLlmSyntaxErrorMessage } from '#/llm/protocol/errors';
+import { isAbortError, SyntaxRequestFormatError, toLlmErrorMessage, toLlmSyntaxErrorMessage } from '#/llm/protocol/errors';
 import type { DecodeSink, LlmModule, ProtocolReply } from '#/llm/protocol/protocol';
 import { withProtocolCapabilities } from '#/llm/protocol/rules/model';
 import type { LlmRequest } from '#/llm/request';
@@ -78,6 +78,15 @@ export async function generate(request: LlmRequest, control: LlmAttemptControl):
   const module = moduleOf(request);
   let encodedRequest: unknown;
   try {
+    for (const message of module.content.messages) {
+      for (const part of message.content) {
+        if (part.type !== 'think' || part.openRouterReasoning === undefined) continue;
+        const source = part.openRouterReasoning;
+        if (source.provider !== module.model.spec.provider || source.model !== module.model.spec.name) {
+          throw new SyntaxRequestFormatError('OpenRouter reasoning history belongs to a different provider or model. Start a new session to use this model; the existing history has been preserved.');
+        }
+      }
+    }
     encodedRequest = base.encode(module, {
       report: (notice) => onEvent?.({ type: 'llm.notice', notice }),
     });

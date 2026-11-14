@@ -124,7 +124,7 @@ timeout = 5
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `type` | `string` | 是 | 供应商类型：`kimi`、`anthropic`、`openai`、`openai_responses`、`google-genai`、`vertexai` |
+| `type` | `string` | 是 | 供应商类型：`kimi`、`anthropic`、`openai`、`openrouter`、`openai_responses`、`google-genai`、`vertexai` |
 | `api_key` | `string` | 否 | API 密钥，明文写在配置文件里 |
 | `api_key_env` | `string` | 否 | 指定一个 shell 环境变量名，从该变量读取 API 密钥，密钥不写入配置文件；每次请求时读取。与 `api_key`、`oauth` 互斥；变量未设置或为空时请求报错并指明变量名 |
 | `base_url` | `string` | 否 | API 基础 URL |
@@ -163,6 +163,7 @@ KIMI_BASE_URL = "https://api.moonshot.ai/v1"
 | `base_url` | `string` | 否 | 模型级端点覆盖（catalog 导入网关模型时写入）；解析时优先于供应商的 `base_url`，仅与 `protocol` 配合时生效 |
 | `display_name` | `string` | 否 | UI 中显示的名称，未设时回退到 `model` |
 | `reasoning_key` | `string` | 否 | 仅 `openai` 供应商；网关用非标准字段名返回推理内容时才需要设置，默认自动识别 `reasoning_content` 等 |
+| `openrouter` | `table` | 否 | OpenRouter 推理和路由选项，见 [OpenRouter 配置](./providers.md#openrouter) |
 | `adaptive_thinking` | `boolean` | 否 | 仅 `anthropic` 供应商；强制开关 adaptive thinking，省略时按模型名自动推断（Claude ≥ 4.6 用 adaptive） |
 
 别名中含 `.` 时需要加引号：

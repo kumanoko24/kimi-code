@@ -11,6 +11,7 @@ Kimi Code CLI 支持同时接入多家模型供应商服务，模型在供应商
 | [`kimi`](#kimi) | OpenAI 兼容 | Kimi Code 托管服务、Kimi Platform API 密钥 |
 | [`anthropic`](#anthropic) | Anthropic Messages | Claude 系列模型 |
 | [`openai`](#openai) | OpenAI Chat Completions | OpenAI 及兼容服务、DeepSeek、Qwen 等 |
+| [`openrouter`](#openrouter) | OpenAI Chat Completions | OpenRouter 路由和结构化推理 |
 | [`openai_responses`](#openai_responses) | OpenAI Responses API | OpenAI 较新的 Responses 接口 |
 | [`google-genai`](#google-genai) | Google GenAI | Gemini API |
 | [`vertexai`](#vertexai) | Google GenAI on Vertex | Google Cloud Vertex AI |
@@ -33,7 +34,7 @@ Kimi Code CLI 支持同时接入多家模型供应商服务，模型在供应商
 
 添加时有两条路径：
 
-- **Known third-party provider**：从 [models.dev](https://models.dev/) 拉取模型目录，选供应商 → 输入 API 密钥 → 选默认模型。目录未声明协议类型的供应商（如 xai、openrouter 这类厂商专用 SDK）会按 OpenAI 兼容协议导入并显示 "guessed" 提示；目录没有可用端点时会先弹出 base URL 输入框；Amazon Bedrock / Cohere 等专有协议和无法识别的显式协议会被拒绝导入。已下线（deprecated）和 alpha 状态的模型不会出现在导入列表中。如果公共目录不可达，CLI 会回退到内置目录快照，离线或网络受限环境下也能完成导入
+- **Known third-party provider**：从 [models.dev](https://models.dev/) 拉取模型目录，选供应商 → 输入 API 密钥 → 选默认模型。目录未声明协议类型的供应商（如 xai 这类厂商专用 SDK）会按 OpenAI 兼容协议导入并显示 "guessed" 提示；目录没有可用端点时会先弹出 base URL 输入框；Amazon Bedrock / Cohere 等专有协议和无法识别的显式协议会被拒绝导入。已下线（deprecated）和 alpha 状态的模型不会出现在导入列表中。如果公共目录不可达，CLI 会回退到内置目录快照，离线或网络受限环境下也能完成导入
 - **Custom registry (api.json)**：粘贴自定义 registry 地址，私有 registry 再附上 Bearer token，CLI 自动创建 `providers` / `models` 条目。当 registry 条目声明了 `env` 字段（存放 API 密钥的环境变量名）时，CLI 会把它作为提示打印出来——想用就在 `config.toml` 里自己设置 `api_key_env`。绑定永远不会自动发生：registry 既决定变量名、又决定凭证发往的端点，不能由它来选择读取你的哪份密钥。对私有 registry，Bearer token 本身仍会存为 `source.apiKey`，供刷新时重新拉取。后续启动时，同一个 registry 地址下的供应商会一起刷新，因此上游新增、删除供应商以及模型元数据变化都会同步。
 
   registry 中的模型还可以声明 `upgrade` 对象。`model` 选择同一供应商下的替代模型，`migration_markdown` 提供迁移说明（其中的 `{model_from}` 和 `{model_to}` 会在导入时替换为模型 ID），`retirement_at` 是可选的 RFC3339 时间戳或 `null`。该字段会保存在对应的模型别名上，并通过 `GET /api/v1/models` 返回，客户端每次重新读取模型目录后都能恢复迁移提示。刷新会同步或移除这些元数据；只要默认模型仍在 registry 中，刷新就不会修改它。registry 删除默认模型时，如果该模型此前声明的 `upgrade` 目标仍然存在，默认模型会切换到该目标并保留 Thinking 设置；否则默认模型与 Thinking 设置一并清空。仍在使用被删除模型的已打开会话也会切换到该目标，目标支持时保留各自的 Thinking 档位。因此下线模型时，应先给它声明 `upgrade` 并保留一段过渡期，让客户端至少刷新一次，再从 registry 中删除。
@@ -121,6 +122,85 @@ type = "openai"
 base_url = "https://api.openai.com/v1"
 api_key = "sk-xxxxx"
 ```
+
+## `openrouter`
+
+通过 `type = "openrouter"` 和模型的 `openai` 协议接入 OpenRouter Chat Completions。此供应商会在工具调用和会话恢复之间保留结构化推理，包括签名或加密状态。它沿用 OpenAI 传输实现，并支持 OpenRouter 专用请求选项。
+
+在环境中设置 `OPENROUTER_API_KEY`，然后将以下别名加入 `config.toml`。每个别名指定一个上游路由并关闭回退；这些是示例中的显式选择，不是供应商默认值。
+
+```toml
+default_model = "gemini"
+
+[providers.openrouter]
+type = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+model_source = "static"
+
+[models.gemini]
+provider = "openrouter"
+model = "google/gemini-4-hydrogen"
+protocol = "openai"
+max_context_size = 1048576
+capabilities = ["thinking", "always_thinking", "tool_use"]
+
+[models.gemini.openrouter.reasoning]
+enabled = true
+
+[models.gemini.openrouter.provider]
+only = ["google-ai-studio/flex"]
+allow_fallbacks = false
+
+[models.muse]
+provider = "openrouter"
+model = "meta/muse-ember"
+protocol = "openai"
+max_context_size = 1048576
+capabilities = ["thinking", "always_thinking", "tool_use"]
+
+[models.muse.openrouter.provider]
+only = ["google-vertex/global"]
+allow_fallbacks = false
+
+[models.deepseek_do]
+provider = "openrouter"
+model = "deepseek/deepseek-v4.1-flash-1017"
+protocol = "openai"
+max_context_size = 1048576
+capabilities = ["thinking", "always_thinking", "tool_use"]
+
+[models.deepseek_do.openrouter.reasoning]
+enabled = true
+
+[models.deepseek_do.openrouter.provider]
+only = ["digitalocean"]
+allow_fallbacks = false
+
+[models.deepseek_baseten]
+provider = "openrouter"
+model = "deepseek/deepseek-v4.1-flash-1017"
+protocol = "openai"
+max_context_size = 1048576
+capabilities = ["thinking", "always_thinking", "tool_use"]
+
+[models.deepseek_baseten.openrouter.reasoning]
+enabled = true
+
+[models.deepseek_baseten.openrouter.provider]
+only = ["baseten/fast"]
+allow_fallbacks = false
+```
+
+运行 `kimi --model gemini`、`kimi --model muse`、`kimi --model deepseek_do` 或 `kimi --model deepseek_baseten`。开始会话前可用 `kimi doctor config` 验证文件。
+
+输出预算和推理强度由普通[模型配置](./config-files.md#models)管理。需要限制输出时才设置 `max_output_size`；推理强度使用模型的 `support_efforts`、`default_effort` 和当前 Thinking 设置。OpenRouter 供应商不会为任何模型添加固定强度或输出上限。
+
+可选的 `[models.<alias>.openrouter.reasoning]` 接受 `enabled`、`effort`、`max_tokens` 和 `exclude`。只要此对象存在，就会整体优先于当前通用 Thinking 设置，即使其中只有 `enabled` 或 `exclude`。省略它即可使用普通模型推理控制，如上面的 Muse 别名。这里的 `max_tokens` 是推理 token 预算，与模型的总输出预算不同。显式字段会传给 OpenRouter，具体支持仍取决于所选端点。
+
+`[models.<alias>.openrouter.provider]` 接受 `only`、`order`、`ignore`、`allow_fallbacks` 和 `require_parameters`。未配置的字段保留 OpenRouter 的默认行为。供应商目录导入使用 models.dev 元数据，不会导入 OpenRouter 原生端点的推理元数据。模型能力和支持的推理强度应与所选端点一致。
+
+如果保留的 OpenRouter 推理属于其他模型或供应商类型，CLI 会在发送前拒绝请求，并提示创建新会话。已有历史会保留。相同 OpenRouter 模型的上游路由变化不在此身份检查范围内；切换到推理兼容性未知的路由时，应创建新会话。
 
 ## `openai_responses`
 

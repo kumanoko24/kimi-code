@@ -453,6 +453,7 @@ function effectiveRecordOf(definition: CatalogModel): ModelRecord {
     maxOutputSize: definition.maxOutputSize,
     displayName: definition.displayName,
     reasoningKey: definition.reasoningKey,
+    openrouter: overrides?.openrouter ?? raw.openrouter,
     adaptiveThinking: definition.adaptiveThinking,
     supportEfforts:
       definition.supportEfforts === undefined ? undefined : [...definition.supportEfforts],
@@ -477,6 +478,7 @@ function buildProtocolProviderOptions(
       if (model.betaApi !== undefined) options.betaApi = model.betaApi;
       break;
     case 'openai': {
+      if (provider?.type === 'openrouter') options.openrouter = model.openrouter;
       const reasoningKey = nonEmpty(model.reasoningKey);
       if (reasoningKey !== undefined) options.reasoningKey = reasoningKey;
       if (model.offEffort !== undefined) options.offEffort = model.offEffort;

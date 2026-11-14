@@ -11,6 +11,7 @@ The `type` field in the `providers` table determines which protocol implementati
 | [`kimi`](#kimi) | OpenAI-compatible | Kimi Code managed service, Kimi Platform API key |
 | [`anthropic`](#anthropic) | Anthropic Messages | Claude model family |
 | [`openai`](#openai) | OpenAI Chat Completions | OpenAI and compatible services, DeepSeek, Qwen, etc. |
+| [`openrouter`](#openrouter) | OpenAI Chat Completions | OpenRouter routing and structured reasoning |
 | [`openai_responses`](#openai_responses) | OpenAI Responses API | OpenAI's newer Responses interface |
 | [`google-genai`](#google-genai) | Google GenAI | Gemini API |
 | [`vertexai`](#vertexai) | Google GenAI on Vertex | Google Cloud Vertex AI |
@@ -33,7 +34,7 @@ The manager displays providers as a list of entries grouped by source. Navigatio
 
 Two paths when adding:
 
-- **Known third-party provider**: fetches the model catalog from [models.dev](https://models.dev/), select a provider → enter an API key → select a default model. Vendors whose protocol the catalog does not declare (e.g. xai, openrouter, and other vendor-specific SDKs) are imported as OpenAI-compatible with a "guessed" note; when the catalog provides no usable endpoint, a base URL prompt appears first; proprietary protocols (Amazon Bedrock, Cohere) and unrecognized explicit protocols are refused. Deprecated and alpha-status models are excluded from the import list. If the public catalog is unreachable, the CLI falls back to a built-in snapshot of the catalog, so the import still works offline or in blocked networks
+- **Known third-party provider**: fetches the model catalog from [models.dev](https://models.dev/), select a provider → enter an API key → select a default model. Vendors whose protocol the catalog does not declare (e.g. xai and other vendor-specific SDKs) are imported as OpenAI-compatible with a "guessed" note; when the catalog provides no usable endpoint, a base URL prompt appears first; proprietary protocols (Amazon Bedrock, Cohere) and unrecognized explicit protocols are refused. Deprecated and alpha-status models are excluded from the import list. If the public catalog is unreachable, the CLI falls back to a built-in snapshot of the catalog, so the import still works offline or in blocked networks
 - **Custom registry (api.json)**: paste a custom registry URL and, for private registries, a Bearer token; the CLI automatically creates the `providers` / `models` entries. When a registry entry declares the `env` field (the name of the environment variable holding the API key), the CLI prints it as a hint — set `api_key_env` in `config.toml` yourself to use it. The binding is never automatic: the registry chooses both the variable name and the endpoint the credential is sent to, so it must not decide which of your secrets is read. For private registries the Bearer token itself is still stored as `source.apiKey` so the registry can be refetched on refresh. On later startup, providers from the same registry URL are refreshed together, so upstream provider additions, removals, and model metadata changes are synced.
 
   A registry model may also declare an `upgrade` object. `model` selects the replacement model in the same provider, `migration_markdown` supplies the explanation shown during migration (`{model_from}` and `{model_to}` in it are replaced with the model ids on import), and `retirement_at` is an optional RFC3339 timestamp or `null`. The field is stored on the corresponding model alias and returned by `GET /api/v1/models`, so clients can recover migration guidance whenever they reload the catalog. Refreshing syncs or removes this metadata and leaves the default model alone while the registry still lists it. When the registry drops the default model, the default moves to the `upgrade` target that model declared if the target still exists, keeping your thinking setting; otherwise the default and the thinking setting are cleared. Open sessions still using the dropped model switch to that target too, keeping their thinking level when the target supports it. To retire a model, declare `upgrade` on it first and keep it listed long enough for clients to refresh at least once, then remove it from the registry.
@@ -121,6 +122,85 @@ type = "openai"
 base_url = "https://api.openai.com/v1"
 api_key = "sk-xxxxx"
 ```
+
+## `openrouter`
+
+Use `type = "openrouter"` with the `openai` model protocol for OpenRouter Chat Completions. This provider preserves structured reasoning, including signed or encrypted state, across tool calls and session resume. It uses the existing OpenAI transport with OpenRouter-specific request options.
+
+Set `OPENROUTER_API_KEY` in the environment, then add these aliases to `config.toml`. Each alias selects one upstream route with fallbacks disabled; these are explicit example choices, not provider defaults.
+
+```toml
+default_model = "gemini"
+
+[providers.openrouter]
+type = "openrouter"
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+model_source = "static"
+
+[models.gemini]
+provider = "openrouter"
+model = "google/gemini-4-hydrogen"
+protocol = "openai"
+max_context_size = 1048576
+capabilities = ["thinking", "always_thinking", "tool_use"]
+
+[models.gemini.openrouter.reasoning]
+enabled = true
+
+[models.gemini.openrouter.provider]
+only = ["google-ai-studio/flex"]
+allow_fallbacks = false
+
+[models.muse]
+provider = "openrouter"
+model = "meta/muse-ember"
+protocol = "openai"
+max_context_size = 1048576
+capabilities = ["thinking", "always_thinking", "tool_use"]
+
+[models.muse.openrouter.provider]
+only = ["google-vertex/global"]
+allow_fallbacks = false
+
+[models.deepseek_do]
+provider = "openrouter"
+model = "deepseek/deepseek-v4.1-flash-1017"
+protocol = "openai"
+max_context_size = 1048576
+capabilities = ["thinking", "always_thinking", "tool_use"]
+
+[models.deepseek_do.openrouter.reasoning]
+enabled = true
+
+[models.deepseek_do.openrouter.provider]
+only = ["digitalocean"]
+allow_fallbacks = false
+
+[models.deepseek_baseten]
+provider = "openrouter"
+model = "deepseek/deepseek-v4.1-flash-1017"
+protocol = "openai"
+max_context_size = 1048576
+capabilities = ["thinking", "always_thinking", "tool_use"]
+
+[models.deepseek_baseten.openrouter.reasoning]
+enabled = true
+
+[models.deepseek_baseten.openrouter.provider]
+only = ["baseten/fast"]
+allow_fallbacks = false
+```
+
+Run `kimi --model gemini`, `kimi --model muse`, `kimi --model deepseek_do`, or `kimi --model deepseek_baseten`. Validate the file with `kimi doctor config` before starting a session.
+
+Output budgets and thinking effort belong to the ordinary [model configuration](./config-files.md#models). Set `max_output_size` only when an output cap is wanted; use the model's `support_efforts`, `default_effort`, and active Thinking setting for effort. The OpenRouter provider adds no fixed effort or output cap for any model.
+
+Optional `[models.<alias>.openrouter.reasoning]` accepts `enabled`, `effort`, `max_tokens`, and `exclude`. When this object is present, it takes precedence as a whole over the active generic Thinking setting, including when it contains only `enabled` or `exclude`. Omit it to use ordinary model thinking controls, as in the Muse alias above. Its `max_tokens` is a reasoning-token budget, distinct from the model's total output budget. The explicit fields are forwarded to OpenRouter; endpoint support still applies.
+
+`[models.<alias>.openrouter.provider]` accepts `only`, `order`, `ignore`, `allow_fallbacks`, and `require_parameters`. Omitted fields retain OpenRouter's defaults. Provider catalog import uses models.dev metadata; it does not import native OpenRouter endpoint reasoning metadata. Keep model capabilities and supported efforts aligned with the selected endpoint.
+
+When retained OpenRouter reasoning belongs to a different model or provider type, the CLI rejects the request before sending it and asks for a new session. Existing history is preserved. A changed upstream route for the same OpenRouter model is not covered by this identity check; use a new session when changing routes whose reasoning compatibility is unknown.
 
 ## `openai_responses`
 

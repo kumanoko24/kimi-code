@@ -59,6 +59,7 @@ export interface ModelsDevModel {
 const KNOWN_WIRE_TYPES = [
   'anthropic',
   'openai',
+  'openrouter',
   'kimi',
   'google-genai',
   'openai_responses',
@@ -141,6 +142,7 @@ export function resolveModelsDevImport(
 }
 
 function resolveModelsDevWire(entry: ModelsDevProviderEntry): ProviderType | undefined {
+  if (entry.id === 'openrouter') return 'openrouter';
   if (isWireType(entry.type)) return entry.type;
   if (typeof entry.type === 'string' && entry.type.length > 0) return undefined;
   const declared = inferDeclaredWireType(entry);

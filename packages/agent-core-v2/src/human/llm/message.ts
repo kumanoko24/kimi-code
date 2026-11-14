@@ -20,9 +20,16 @@ export interface TextPart extends ContentPartBase {
   text: string;
 }
 
+export interface OpenRouterReasoning {
+  provider: 'openrouter';
+  model: string;
+  details: Record<string, unknown>[];
+}
+
 export interface ThinkPart extends ContentPartBase {
   type: 'think';
   think: string;
+  openRouterReasoning?: OpenRouterReasoning;
   encrypted?: string;
   detailsIndex?: number;
   hidden?: boolean;
@@ -164,7 +171,7 @@ export function isVacuousContentPart(part: ContentPart): boolean {
     case 'text':
       return part.meta?.['thought_signature_b64'] === undefined && part.text.trim().length === 0;
     case 'think':
-      return part.encrypted === undefined && part.hidden !== true && part.think.trim().length === 0;
+      return part.openRouterReasoning === undefined && part.encrypted === undefined && part.hidden !== true && part.think.trim().length === 0;
     case 'image_url':
     case 'audio_url':
     case 'video_url':
@@ -258,6 +265,7 @@ export function mergeInPlace(target: StreamedMessagePart, source: StreamedMessag
   }
 
   if (target.type === 'think' && source.type === 'think') {
+    if (target.openRouterReasoning !== undefined || source.openRouterReasoning !== undefined) return false;
     if (target.encrypted !== undefined) return false;
     if (target.detailsIndex !== source.detailsIndex) return false;
     if (target.hidden !== source.hidden) return false;

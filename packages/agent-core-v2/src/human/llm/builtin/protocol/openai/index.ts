@@ -36,6 +36,7 @@ export { openAIModelLegality, resolveOpenAIReasoningKey } from './legalize';
 
 export interface OpenAIOptions {
   readonly extras?: OpenAIExtraParams;
+  readonly openrouter?: import('../../provider/openrouter/options').OpenRouterOptions;
   readonly reasoningKey?: string;
   readonly detectedReasoningKey?: string;
   readonly onReasoningKey?: (reasoningKey: string) => void;

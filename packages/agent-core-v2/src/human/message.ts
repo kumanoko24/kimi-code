@@ -1,5 +1,6 @@
 import type {
   ContentPart as CoreContentPart,
+  OpenRouterReasoning,
   Message as CoreMessage,
   StreamedMessagePart as CoreStreamedMessagePart,
 } from '#/llm/message';
@@ -29,6 +30,7 @@ export interface TextPart {
 export interface ThinkPart {
   type: 'think';
   think: string;
+  openRouterReasoning?: OpenRouterReasoning;
   encrypted?: string;
   detailsIndex?: number;
   hidden?: boolean;
@@ -117,6 +119,7 @@ export function mergeInPlace(target: StreamedMessagePart, source: StreamedMessag
   }
 
   if (target.type === 'think' && source.type === 'think') {
+    if (target.openRouterReasoning !== undefined || source.openRouterReasoning !== undefined) return false;
     if (target.encrypted !== undefined) {
       return false;
     }
@@ -193,7 +196,7 @@ export function isVacuousContentPart(part: ContentPart): boolean {
     case 'text':
       return part.text.trim().length === 0;
     case 'think':
-      return part.encrypted === undefined && part.hidden !== true && part.think.trim().length === 0;
+      return part.openRouterReasoning === undefined && part.encrypted === undefined && part.hidden !== true && part.think.trim().length === 0;
     case 'image_url':
     case 'audio_url':
     case 'video_url':
@@ -299,6 +302,7 @@ export function toCorePart(part: ContentPart): CoreContentPart {
       return {
         type: 'think',
         think: part.think,
+        openRouterReasoning: part.openRouterReasoning,
         encrypted: part.encrypted,
         detailsIndex: part.detailsIndex,
         hidden: part.hidden,
@@ -345,6 +349,7 @@ export function fromCorePart(part: CoreStreamedMessagePart): StreamedMessagePart
       return {
         type: 'think',
         think: part.think,
+        openRouterReasoning: part.openRouterReasoning,
         ...(part.encrypted === undefined ? {} : { encrypted: part.encrypted }),
         ...(part.detailsIndex === undefined ? {} : { detailsIndex: part.detailsIndex }),
         ...(part.hidden === undefined ? {} : { hidden: part.hidden }),
