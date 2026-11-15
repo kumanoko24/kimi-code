@@ -47,8 +47,6 @@ const AGENT_TOOLS = [
 
 const CODER_TOOLS = [
   'AcpAgent',
-  'ListAgents',
-  'SendMessage',
   'NotifyUser',
   'Bash',
   'CronCreate',

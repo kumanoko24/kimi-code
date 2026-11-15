@@ -12,6 +12,10 @@ import { IAgentLoopService, type LoopNotifyEntry } from '#/agent/loop/loop';
 import type { ApprovalResponse } from '#/agent/interaction/approval';
 import { IAgentLifecycleService, MAIN_AGENT_ID } from '#/session/agentLifecycle/agentLifecycle';
 import { ILogService } from '#/_base/log/log';
+import { IEventBus } from '#/app/event/eventBus';
+import { AgentStatusUpdated } from '#/agent/usage/usageEvents';
+import { IAgentSwarmService } from '#/features/swarm/agent/swarm';
+import { IAgentTowerService } from '#/features/tower/tower';
 import { IBootstrapService } from '#/app/bootstrap/bootstrap';
 import { IConfigService } from '#/app/config/config';
 import { interactions } from '#/human/interaction/facade';
@@ -61,6 +65,7 @@ export class PeerService extends Service implements IPeerService {
     @IBootstrapService private readonly bootstrap: IBootstrapService,
     @IConfigService private readonly configService: IConfigService,
     @IAgentLifecycleService private readonly lifecycle: IAgentLifecycleService,
+    @IEventBus private readonly eventBus: IEventBus,
     @ILogService private readonly log: ILogService,
   ) {
     super();
@@ -94,6 +99,12 @@ export class PeerService extends Service implements IPeerService {
     this.watcher.on('error', (error) => {
       this.log.warn('peer inbox watcher failed', { error: String(error) });
     });
+    this._register(
+      this.eventBus.subscribe(AgentStatusUpdated, (event) => {
+        if (event.agentId !== MAIN_AGENT_ID) return;
+        if (event.swarmMode === false || event.towerMode === false) void this.processInbox();
+      }),
+    );
     this._register(
       toDisposable(() => {
         this.disposeController.abort(new Error('peer service disposed'));
@@ -205,6 +216,7 @@ export class PeerService extends Service implements IPeerService {
         return;
       }
       if (this.lifecycle.handleOf(MAIN_AGENT_ID) === undefined) return;
+      if (this.modeActive()) return;
       const config = this.readConfig();
       const maxChars = config.maxMessageChars ?? DEFAULT_MAX_PEER_MESSAGE_CHARS;
       if (message.text.length > maxChars) {
@@ -244,6 +256,20 @@ export class PeerService extends Service implements IPeerService {
     } finally {
       this.inFlight.delete(file);
     }
+  }
+
+  private modeActive(): boolean {
+    const handle = this.lifecycle.handleOf(MAIN_AGENT_ID);
+    if (handle === undefined) return false;
+    try {
+      if (handle.accessor.get(IAgentSwarmService)?.isActive) return true;
+    } catch {
+    }
+    try {
+      if (handle.accessor.get(IAgentTowerService)?.isActive) return true;
+    } catch {
+    }
+    return false;
   }
 
   private async inject(message: PeerMessage): Promise<boolean> {
