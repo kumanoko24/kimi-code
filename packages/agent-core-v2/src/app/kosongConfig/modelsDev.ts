@@ -126,7 +126,7 @@ export function resolveModelsDevImport(
           : 'proprietary-sdk',
     };
   }
-  const guessed = inferDeclaredWireType(entry) === undefined;
+  const guessed = wire === 'openai' && inferDeclaredWireType(entry) === undefined;
 
   if (userBaseUrl !== undefined) {
     const trimmed = userBaseUrl.trim();

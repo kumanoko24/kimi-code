@@ -1,4 +1,5 @@
 import { parsePattern } from '@moonshot-ai/agent-core-v2/agent/permissionRules/matchesRule';
+import { OpenRouterOptionsSchema } from '@moonshot-ai/agent-core-v2/human/llm/builtin/provider/openrouter/options';
 import { EnvironmentsSectionSchema } from '@moonshot-ai/agent-core-v2/remote/declaration/remoteEnvironmentDeclaration';
 import { z } from 'zod';
 
@@ -26,6 +27,7 @@ const HOOK_EVENT_TYPES = [
 export const ProviderTypeSchema = z.enum([
   'anthropic',
   'openai',
+  'openrouter',
   'kimi',
   'google-genai',
   'openai_responses',
@@ -75,7 +77,8 @@ const ModelAliasBaseSchema = z.object({
   capabilities: z.array(z.string()).optional(),
   displayName: z.string().optional(),
   reasoningKey: z.string().optional(),
-  protocol: z.enum(['anthropic', 'openai_responses']).optional(),
+  openrouter: OpenRouterOptionsSchema.optional(),
+  protocol: z.enum(['anthropic', 'openai', 'openai_responses']).optional(),
   adaptiveThinking: z.boolean().optional(),
   supportEfforts: z.array(z.string()).optional(),
   defaultEffort: z.string().optional(),

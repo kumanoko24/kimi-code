@@ -1024,6 +1024,11 @@ export interface AgentStateSnapshot {
   } | /* ThinkPart — packages/agent-core-v2/src/human/llm/message.ts */ {
     type: 'think';
     think: string;
+    openRouterReasoning?: /* OpenRouterReasoning — packages/agent-core-v2/src/human/llm/message.ts */ {
+      provider: 'openrouter';
+      model: string;
+      details: Record<string, unknown>[];
+    };
     encrypted?: string;
     detailsIndex?: number;
     hidden?: boolean;

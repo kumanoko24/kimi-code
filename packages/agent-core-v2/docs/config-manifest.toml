@@ -299,6 +299,18 @@ merge_all_available_skills = true
   # capabilities: string[]
   # display_name: string
   # reasoning_key: string
+  # openrouter: object
+    # reasoning: object
+      # enabled: boolean
+      # effort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"
+      # max_tokens: integer
+      # exclude: boolean
+    # provider: object
+      # only: string[]
+      # order: string[]
+      # ignore: string[]
+      # allow_fallbacks: boolean
+      # require_parameters: boolean
   # adaptive_thinking: boolean
   # beta_api: boolean
   # support_efforts: string[]
@@ -315,6 +327,18 @@ merge_all_available_skills = true
     # capabilities: string[]
     # display_name: string
     # reasoning_key: string
+    # openrouter: object
+      # reasoning: object
+        # enabled: boolean
+        # effort: "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"
+        # max_tokens: integer
+        # exclude: boolean
+      # provider: object
+        # only: string[]
+        # order: string[]
+        # ignore: string[]
+        # allow_fallbacks: boolean
+        # require_parameters: boolean
     # adaptive_thinking: boolean
     # support_efforts: string[]
     # default_effort: string
