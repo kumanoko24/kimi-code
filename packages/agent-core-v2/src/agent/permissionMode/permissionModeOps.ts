@@ -20,7 +20,7 @@ export interface PermissionSetMode {
   readonly mode: PermissionMode;
 }
 
-export const permissionModeKey = defineState('permissionMode', (): PermissionMode => 'manual')
+export const permissionModeKey = defineState('permissionMode', (): PermissionMode => 'auto')
   .replayable({ schema: z.custom<PermissionMode>() })
   .on(PermissionSetMode, (_s, e) => e.mode);
 

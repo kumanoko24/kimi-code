@@ -1435,7 +1435,7 @@ describe('AgentLifecycleService', () => {
     svc.broadcastPermissionMode('yolo');
 
     expect(svc.handleOf('main')!.accessor.get(IAgentStateService).get(permissionModeKey)).toBe('yolo');
-    expect(svc.handleOf('worker-1')!.accessor.get(IAgentStateService).get(permissionModeKey)).toBe('manual');
+    expect(svc.handleOf('worker-1')!.accessor.get(IAgentStateService).get(permissionModeKey)).toBe('auto');
   });
 
   it('wires MCP OAuth credentials through the session atomic document store', async () => {

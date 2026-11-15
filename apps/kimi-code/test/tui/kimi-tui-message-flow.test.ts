@@ -688,7 +688,7 @@ describe('KimiTUI message flow', () => {
       workDir: '/tmp/proj-a',
       model: 'k2',
       thinking: undefined,
-      permission: 'manual',
+      permission: 'auto',
       planMode: undefined,
     });
     expect(driver.getCurrentSessionId()).toBe('ses-lazy');
@@ -2847,7 +2847,7 @@ describe('KimiTUI message flow', () => {
       }> => ({
         models: { k2: { model: 'moonshot-v1', maxContextSize: 100 } },
         defaultModel: 'k2',
-        defaultPermissionMode: 'auto',
+        defaultPermissionMode: 'yolo',
       }),
     );
     const startupInput: KimiTUIStartupInput = {
@@ -2855,7 +2855,7 @@ describe('KimiTUI message flow', () => {
       cliOptions: { ...makeStartupInput().cliOptions },
     };
     const { driver } = await makeDriver(session, { getConfig }, startupInput);
-    expect(driver.state.appState.permissionMode).toBe('auto');
+    expect(driver.state.appState.permissionMode).toBe('yolo');
 
     getConfig.mockResolvedValue({
       models: { k2: { model: 'moonshot-v1', maxContextSize: 100 } },
@@ -2864,7 +2864,7 @@ describe('KimiTUI message flow', () => {
     driver.handleUserInput('/reload');
 
     await vi.waitFor(() => {
-      expect(driver.state.appState.permissionMode).toBe('manual');
+      expect(driver.state.appState.permissionMode).toBe('auto');
     });
   });
 

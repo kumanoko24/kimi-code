@@ -292,11 +292,7 @@ type MutableCreateSessionOptions = {
 };
 
 function createInitialAppState(input: KimiTUIStartupInput): AppState {
-  const startupPermission: PermissionMode = input.cliOptions.auto
-    ? 'auto'
-    : input.cliOptions.yolo
-      ? 'yolo'
-      : 'manual';
+  const startupPermission: PermissionMode = input.cliOptions.yolo ? 'yolo' : 'auto';
   return {
     model: '',
     workDir: input.workDir,
@@ -3297,9 +3293,9 @@ export class KimiTUI {
     // CLI --auto/--yolo/--plan win over config defaults; the flags are
     // re-applied by applyStartupPermissionAndPlanToAppState at startup.
     if (!startup.auto && !startup.yolo) {
-      // Reset to manual when the default was removed from config — a stale
-      // elevated mode must not be passed to the first lazy-created session.
-      patch.permissionMode = config.defaultPermissionMode ?? 'manual';
+      // Reset to the built-in default when the config default is removed — a
+      // stale mode must not be passed to the first lazy-created session.
+      patch.permissionMode = config.defaultPermissionMode ?? 'auto';
     }
     // Track the config default itself (vs an explicit CLI --plan) so the lazy
     // create path can tell which one would activate plan mode; a removed

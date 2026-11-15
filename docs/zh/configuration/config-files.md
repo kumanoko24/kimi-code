@@ -22,7 +22,7 @@ TOML 字段名一律用下划线（snake_case），如 `default_model`、`max_co
 
 ```toml
 default_model = "kimi-code/k3"
-default_permission_mode = "manual"
+default_permission_mode = "auto"
 default_plan_mode = false
 merge_all_available_skills = true
 telemetry = true
@@ -95,7 +95,7 @@ timeout = 5
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `default_model` | `string` | — | 默认模型别名，必须在 `models` 中定义 |
-| `default_permission_mode` | `string` | `manual` | 新会话的默认权限模式，可选 `yolo` / `auto`，见 [交互与权限](../guides/interaction.md#三种权限模式) |
+| `default_permission_mode` | `string` | `auto` | 新会话的默认权限模式，可选 `manual` / `yolo` / `auto`，见 [交互与权限](../guides/interaction.md#三种权限模式) |
 | `default_plan_mode` | `boolean` | `false` | 新会话是否默认以 [Plan 模式](../guides/interaction.md#plan-模式)启动。非交互模式（`kimi -p`）下不生效 |
 | `merge_all_available_skills` | `boolean` | `true` | 是否合并所有目录中的 Agent Skills |
 | `extra_skill_dirs` | `array<string>` | — | 额外 Skill 搜索目录，叠加到默认目录之上 |

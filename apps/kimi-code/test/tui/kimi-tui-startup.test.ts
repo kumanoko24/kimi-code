@@ -723,7 +723,7 @@ describe('KimiTUI startup', () => {
     expect(driver.state.appState).toMatchObject({
       sessionId: '',
       model: '',
-      permissionMode: 'manual',
+      permissionMode: 'auto',
       planMode: false,
     });
 
