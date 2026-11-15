@@ -8,7 +8,8 @@
 # commented "# field: type" lines describe the remaining schema fields.
 # Values resolve as: default -> config.toml -> env overlay -> memory.
 
-# Index (31 sections · 2 overlay(s))
+# Index (32 sections · 2 overlay(s))
+#   acpAgents                src/agent/tools/acp/configSection.ts
 #   background               src/agent/task/configSection.ts
 #   builtinProductSkills     src/features/skill/catalog/configSection.ts
 #   cron                     src/features/cron/configSection.ts
@@ -42,6 +43,23 @@
 #   workspace                src/workspace/workspaceTrust/configSection.ts
 #   (overlay) servicesCredentialEnvOverlay  src/app/auth/configSection.ts
 #   (overlay) kimiModelEnvOverlay  src/app/kosongConfig/envOverlay.ts
+
+# ##########################################################################
+# acpAgents (config.toml: acp_agents)
+#   owner: src/agent/tools/acp/configSection.ts
+#   scope: core
+# ##########################################################################
+
+[acp_agents]
+
+# one [acp_agents."<name>"] table per entry:
+# [acp_agents."<name>"]
+  # command: string
+  # args: string[]
+  # cwd: string
+  # env: record<string, string>
+  # model: string
+  # effort: string
 
 # ##########################################################################
 # background

@@ -9,6 +9,7 @@ import {
 import EXPLORE_ROLE from './explore-overlay.md?raw';
 
 const AGENT_TOOLS = [
+  'AcpAgent',
   'Read',
   'Write',
   'Edit',
@@ -43,6 +44,7 @@ const AGENT_TOOLS = [
 ] as const;
 
 const CODER_TOOLS = [
+  'AcpAgent',
   'NotifyUser',
   'Bash',
   'CronCreate',

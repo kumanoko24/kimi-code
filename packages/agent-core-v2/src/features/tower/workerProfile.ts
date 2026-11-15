@@ -12,6 +12,7 @@ import { TOWER_WORKER_PROFILE } from './tower';
 import TOWER_WORKER_ROLE_OVERLAY from './tower-worker-overlay.md?raw';
 
 const TOWER_WORKER_TOOLS = [
+  'AcpAgent',
   'Bash',
   'TowerComplete',
   'TowerFinding',
