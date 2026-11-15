@@ -12,7 +12,7 @@ import { IAgentLoopService, type LoopNotifyEntry } from '#/agent/loop/loop';
 import type { ApprovalResponse } from '#/agent/interaction/approval';
 import { IAgentLifecycleService, MAIN_AGENT_ID } from '#/session/agentLifecycle/agentLifecycle';
 import { ILogService } from '#/_base/log/log';
-import { IEventBus } from '#/app/event/eventBus';
+import { ISessionEventBus } from '#/app/event/eventBus';
 import { AgentStatusUpdated } from '#/agent/usage/usageEvents';
 import { IAgentSwarmService } from '#/features/swarm/agent/swarm';
 import { IAgentTowerService } from '#/features/tower/tower';
@@ -65,7 +65,7 @@ export class PeerService extends Service implements IPeerService {
     @IBootstrapService private readonly bootstrap: IBootstrapService,
     @IConfigService private readonly configService: IConfigService,
     @IAgentLifecycleService private readonly lifecycle: IAgentLifecycleService,
-    @IEventBus private readonly eventBus: IEventBus,
+    @ISessionEventBus private readonly eventBus: ISessionEventBus,
     @ILogService private readonly log: ILogService,
   ) {
     super();
@@ -243,7 +243,7 @@ export class PeerService extends Service implements IPeerService {
         await archivePeerMessage(this.homeDir, this.self.sessionId, file, message.id, 'refused');
         return;
       }
-      if (!(await this.inject(message))) return;
+      if (!this.inject(message)) return;
       await archivePeerMessage(this.homeDir, this.self.sessionId, file, message.id, 'delivered');
     } catch (error) {
       this.log.warn('peer message processing failed', {
@@ -272,7 +272,7 @@ export class PeerService extends Service implements IPeerService {
     return false;
   }
 
-  private async inject(message: PeerMessage): Promise<boolean> {
+  private inject(message: PeerMessage): boolean {
     const handle = this.lifecycle.handleOf(MAIN_AGENT_ID);
     const loop = handle?.accessor.get(IAgentLoopService);
     if (loop === undefined) return false;
@@ -287,7 +287,7 @@ export class PeerService extends Service implements IPeerService {
       },
       meta: { origin },
     };
-    await loop.notifyClient(entry);
+    loop.sendNow(entry);
     return true;
   }
 
