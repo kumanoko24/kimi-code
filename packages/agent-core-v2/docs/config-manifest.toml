@@ -8,7 +8,7 @@
 # commented "# field: type" lines describe the remaining schema fields.
 # Values resolve as: default -> config.toml -> env overlay -> memory.
 
-# Index (32 sections · 2 overlay(s))
+# Index (33 sections · 2 overlay(s))
 #   acpAgents                src/agent/tools/acp/configSection.ts
 #   background               src/agent/task/configSection.ts
 #   builtinProductSkills     src/features/skill/catalog/configSection.ts
@@ -28,6 +28,7 @@
 #   mergeAllAvailableSkills  src/features/skill/catalog/configSection.ts
 #   modelCatalog             src/app/kosongConfig/configSection.ts
 #   models                   src/app/kosongConfig/configSection.ts
+#   peers                    src/features/peers/configSection.ts
 #   permission               src/agent/permissionRules/configSection.ts
 #   providers                src/app/kosongConfig/configSection.ts
 #   read                     src/agent/tools/os/read/configSection.ts
@@ -361,6 +362,17 @@ merge_all_available_skills = true
     # support_efforts: string[]
     # default_effort: string
     # off_effort: string
+
+# ##########################################################################
+# peers
+#   owner: src/features/peers/configSection.ts
+#   scope: core
+# ##########################################################################
+
+[peers]
+# name: string
+inbound = "hold"
+max_message_chars = 100000
 
 # ##########################################################################
 # permission

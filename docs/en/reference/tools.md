@@ -92,6 +92,8 @@ Collaboration tools handle inter-Agent coordination, user interaction, and Skill
 | `Agent` | Auto-allow | Spawn a sub-Agent to execute a subtask |
 | `AgentSwarm` | Auto-allow; runs only in swarm mode | Launch item-based subagents or resume existing subagents |
 | `AcpAgent` | Requires approval; experimental | Run an external ACP coding agent as a worker |
+| `ListAgents` | Auto-allow; experimental | List other live kimi sessions on this machine |
+| `SendMessage` | Auto-allow; experimental | Send a text message to another kimi session |
 | `AskUserQuestion` | Auto-allow | Ask the user a question to gather structured input |
 | `NotifyUser` | Auto-allow | Show the user a short progress update mid-turn |
 | `Skill` | Auto-allow | Invoke a registered inline Skill |
@@ -111,6 +113,8 @@ args = ["acp"]
 If the agent exposes ACP model and thinking-level selectors, set `model` and `effort` in the same table; the tool applies them with `session/set_config_option` after creating the session. For example, agy accepts `model = "gemini-4-hydrogen"` and `effort = "xhigh"`.
 
 The feature is off by default. Enable it with `KIMI_CODE_EXPERIMENTAL_ACP_AGENT=1` or `[experimental] acp_agent = true`; this applies to sessions created afterwards. The run is bounded by [`[subagent] timeout_ms`](../configuration/config-files.md#subagent). The external agent's permission requests follow the session's permission mode: Ask When Needed and Never Ask approve them, Always Ask shows an approval prompt.
+
+**`ListAgents`** and **`SendMessage`** let live kimi sessions on the same machine exchange plain-text messages. `ListAgents` returns each session's name, session ID, working directory, and whether it is the current session. `SendMessage` takes `to` (a name or session ID) and `message`. The receiver sees the text as a message from another kimi session, not from you; it cannot approve permissions, change configuration, or run slash commands. Messages are local to this machine, share the same `KIMI_CODE_HOME`, and carry no conversation history or files. The default inbound policy is `hold`: the receiving session asks before injecting a message. Configure with `[peers] inbound = "accept" | "hold" | "refuse"`; non-interactive sessions refuse held messages. Set `[peers] name` to a short prefix; names are `<prefix>-<short session id>` (defaults to the cwd basename). Set `[peers] max_message_chars` (default 100000). The feature is off by default; enable it with `KIMI_CODE_EXPERIMENTAL_CROSS_SESSION=1` or `[experimental] cross_session = true`.
 
 **`AskUserQuestion`** asks the user a structured multiple-choice question — useful for disambiguation or option selection. The `questions` parameter accepts 1–4 questions; each question requires `question` (ending with `?`), `options` (2–4 choices, each with a `label` and `description`), and optional `header` (max 12 characters) and `multi_select` (defaults to false). An "Other" option is appended automatically. In Kimi Code for VS Code, multi-question prompts provide Back navigation and preserve previously selected or custom answers while moving between questions. Setting `background` to true starts a background question task and returns a task ID immediately; the question stays open after the turn ends, and the answer is delivered to the Agent as a notification once the user responds. When the host does not support interactive questioning, a failure message is returned and the Agent should ask the user directly in a text reply instead.
 

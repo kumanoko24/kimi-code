@@ -92,6 +92,8 @@ Plan 模式是一种受约束的工作状态，只能由用户打开（`Shift-Ta
 | `Agent` | 自动放行 | 派生 subagent 执行子任务 |
 | `AgentSwarm` | 自动放行；仅在 swarm mode 中可用 | 启动基于 item 的 subagent，或恢复已有 subagent |
 | `AcpAgent` | 需审批；实验性功能 | 把外部 ACP coding agent 当作 worker 运行 |
+| `ListAgents` | 自动放行；实验性功能 | 列出本机其他 live kimi session |
+| `SendMessage` | 自动放行；实验性功能 | 向另一个 kimi session 发送文本消息 |
 | `AskUserQuestion` | 自动放行 | 向用户提问以获取结构化输入 |
 | `NotifyUser` | 自动放行 | 在轮次进行中向用户展示一条简短的进展更新 |
 | `Skill` | 自动放行 | 调用已注册的 inline Skill |
@@ -111,6 +113,8 @@ args = ["acp"]
 如果 agent 暴露 ACP 的 model 和 thinking level 选择器，可以在同一个表中设置 `model` 和 `effort`；工具会在创建会话后通过 `session/set_config_option` 应用它们。例如，agy 可以设置 `model = "gemini-4-hydrogen"` 和 `effort = "xhigh"`。
 
 该功能默认关闭。设置 `KIMI_CODE_EXPERIMENTAL_ACP_AGENT=1` 或 `[experimental] acp_agent = true` 开启；仅对之后新建的会话生效。单轮运行受 [`[subagent] timeout_ms`](../configuration/config-files.md#subagent) 限制。外部 agent 的权限请求遵循会话的权限模式：必要时询问和完全自动会放行，始终询问会弹出审批。
+
+**`ListAgents`** 和 **`SendMessage`** 让同一台机器上的 live kimi session 交换纯文本消息。`ListAgents` 返回每个 session 的名称、session ID、工作目录，以及它是否就是当前 session。`SendMessage` 接受 `to`（名称或 session ID）和 `message`。接收方看到的文字来自另一个 kimi session，而不是来自你；它不能用来批准权限、修改配置或运行斜杠命令。消息只在本机传递，共享同一个 `KIMI_CODE_HOME`，不携带对话历史或文件。默认入站策略是 `hold`：接收 session 会先询问再注入。可用 `[peers] inbound = "accept" | "hold" | "refuse"` 配置；非交互 session 会拒绝 hold 的消息。用 `[peers] name` 设置短前缀；名称是 `<prefix>-<short session id>`（默认使用 cwd 的 basename）。用 `[peers] max_message_chars` 设置长度上限（默认 100000）。该功能默认关闭；设置 `KIMI_CODE_EXPERIMENTAL_CROSS_SESSION=1` 或 `[experimental] cross_session = true` 开启。
 
 **`AskUserQuestion`** 以结构化多选题的形式向用户提问，适用于需要消歧或选择方案的场景。`questions` 参数接受 1–4 道题，每道题需提供 `question`（以 `?` 结尾）、`options`（2–4 个选项，每项含 `label` 和 `description`）以及可选的 `header`（最多 12 字符）和 `multi_select`（默认 false）。系统自动附加"其他"选项。在 Kimi Code for VS Code 中，包含多道题的提问支持 Back 导航，并在题目之间切换时保留已选择或自定义的答案。`background` 为 true 时启动后台问题任务并立即返回任务 ID；问题在本轮结束后仍保持待答，用户作答后答案会以通知形式直接送回 Agent。宿主未实现交互式提问能力时返回失败提示，Agent 应改为在文本回复中直接提问。
 
