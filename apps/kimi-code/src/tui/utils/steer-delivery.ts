@@ -78,6 +78,14 @@ export function isInTurnUserOrigin(origin: unknown): boolean {
   return 'kind' in origin && origin.kind === 'user' && 'inTurn' in origin && origin.inTurn === true;
 }
 
+export function isPeerOrigin(origin: unknown): boolean {
+  if (origin === null || typeof origin !== 'object') return false;
+  if (!('kind' in origin) || origin.kind !== 'user') return false;
+  const metadata = 'clientMetadata' in origin ? origin.clientMetadata : undefined;
+  if (!Array.isArray(metadata)) return false;
+  return metadata.some((entry) => entry !== null && typeof entry === 'object' && 'peer' in entry);
+}
+
 // A shorter pending steer must not match inside a different message.
 // Skill activation text is prepended and ends at `</skill-loaded>`, so the
 // submitted user text is also a suffix immediately after `>`.

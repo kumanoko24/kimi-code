@@ -71,7 +71,7 @@ import { currentTheme } from '#/tui/theme';
 import type { ColorToken } from '#/tui/theme';
 import { errorReportHintLine } from '../constant/feedback';
 import { formatStepDebugTiming } from '#/utils/usage/debug-timing';
-import { isTurnPromptEvent, isTurnSteerEvent, isUserSteerOrigin } from '../utils/steer-delivery';
+import { isPeerOrigin, isTurnPromptEvent, isTurnSteerEvent, isUserSteerOrigin } from '../utils/steer-delivery';
 import { nextTranscriptId } from '../utils/transcript-id';
 import { isToolCallId } from '../utils/turn-timeline';
 import type { BtwPanelController } from './btw-panel';
@@ -374,6 +374,7 @@ export class SessionEventHandler {
     this.host.streamingUI.timeline.turnStarted();
     this.host.acknowledgeSteerTurnStarted?.(event.promptId);
     this.host.handleTurnStarted?.(event);
+    this.appendPeerPrompt(event);
     this.currentTurnHasAssistantText = false;
     if (event.origin?.kind === 'plugin_command') {
       this.pluginCommandTurns.set(String(event.turnId), event.origin.pluginId);
@@ -392,6 +393,17 @@ export class SessionEventHandler {
     this.host.setAppState({
       streamingPhase: 'waiting',
       streamingStartTime: Date.now(),
+    });
+  }
+
+  private appendPeerPrompt(event: TurnStartedEvent): void {
+    const prompt = event.prompt;
+    if (prompt === undefined || prompt.length === 0 || !isPeerOrigin(event.origin)) return;
+    this.host.appendTranscriptEntry({
+      id: nextTranscriptId(),
+      kind: 'user',
+      renderMode: 'plain',
+      content: prompt,
     });
   }
 
