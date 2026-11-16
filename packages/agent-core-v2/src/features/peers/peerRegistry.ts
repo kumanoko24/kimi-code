@@ -43,7 +43,15 @@ export async function ensurePeerDirs(homeDir: string): Promise<void> {
 export function defaultPeerName(cwd: string, sessionId: string, prefix?: string): string {
   const source = prefix === undefined || prefix.length === 0 ? basename(cwd) : prefix;
   const base = source.replaceAll(/[^A-Za-z0-9._-]/g, '-') || 'kimi';
-  return `${base}-${sessionId.slice(0, 6)}`;
+  return `${base}-${sessionId.replace(/^session_/, '').slice(0, 8)}`;
+}
+
+export function peerNameFromTitle(title: string): string | undefined {
+  const name = title
+    .replaceAll(/[\s\u0000-\u001F\u007F]+/g, '-')
+    .replaceAll(/^-+|-+$/g, '')
+    .slice(0, 64);
+  return name.length === 0 ? undefined : name;
 }
 
 export async function registerPeer(homeDir: string, info: PeerInfo): Promise<void> {

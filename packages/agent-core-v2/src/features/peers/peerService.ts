@@ -27,6 +27,7 @@ import {
   INTERACTION_TAG_TOOL_CALL_ID,
 } from '#/human/interaction/interaction';
 import { ISessionContext } from '#/session/sessionContext/sessionContext';
+import { ISessionMetadata } from '#/session/sessionMetadata/sessionMetadata';
 import type { UserPromptOrigin } from '#human/agent/origin';
 
 import { PEERS_SECTION, type PeersConfig } from './configSection';
@@ -38,6 +39,7 @@ import {
   listPeers,
   parsePeerMessage,
   peerMessageText,
+  peerNameFromTitle,
   registerPeer,
   resolvePeer,
   unregisterPeer,
@@ -54,7 +56,7 @@ import {
 export class PeerService extends Service implements IPeerService {
   declare readonly _serviceBrand: undefined;
   readonly ready: Promise<void>;
-  readonly self: PeerInfo;
+  self: PeerInfo;
 
   private readonly homeDir: string;
   private readonly inbox: string;
@@ -68,6 +70,7 @@ export class PeerService extends Service implements IPeerService {
     @IConfigService private readonly configService: IConfigService,
     @IAgentLifecycleService private readonly lifecycle: IAgentLifecycleService,
     @ISessionEventBus private readonly eventBus: ISessionEventBus,
+    @ISessionMetadata private readonly metadata: ISessionMetadata,
     @ILogService private readonly log: ILogService,
   ) {
     super();
@@ -89,9 +92,19 @@ export class PeerService extends Service implements IPeerService {
     return this.configService.get<PeersConfig | undefined>(PEERS_SECTION) ?? {};
   }
 
+  private async syncName(): Promise<void> {
+    const meta = await this.metadata.read();
+    const title = meta.titleKind === 'custom' ? peerNameFromTitle(meta.title ?? '') : undefined;
+    const name = title ?? defaultPeerName(this.session.cwd, this.session.sessionId, this.readConfig().name);
+    if (name === this.self.name) return;
+    this.self = { ...this.self, name };
+    await registerPeer(this.homeDir, this.self);
+  }
+
   private async start(): Promise<void> {
     await ensurePeerDirs(this.homeDir);
     await mkdir(this.inbox, { recursive: true, mode: 0o700 });
+    await this.syncName();
     await registerPeer(this.homeDir, this.self);
     this.watcher = watch(this.inbox, { ignoreInitial: false, depth: 0 });
     this.watcher.on('add', (file) => {
@@ -105,6 +118,13 @@ export class PeerService extends Service implements IPeerService {
       this.eventBus.subscribe(AgentStatusUpdated, (event) => {
         if (event.agentId !== MAIN_AGENT_ID) return;
         if (event.swarmMode === false || event.towerMode === false) void this.processInbox();
+      }),
+    );
+    this._register(
+      this.metadata.onDidChangeMetadata((event) => {
+        if (event.changed.includes('title') || event.changed.includes('titleKind')) {
+          void this.syncName();
+        }
       }),
     );
     this._register(
