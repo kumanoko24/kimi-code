@@ -288,6 +288,22 @@ export class AgentProfileService extends Disposable implements IAgentProfileServ
     return undefined;
   }
 
+  async refreshTools(current?: ProfileBindingSnapshot): Promise<ProfileUpdateData | undefined> {
+    if (current?.profileName === undefined) return undefined;
+    await this.catalog.ready;
+    const profile = this.catalog.get(current.profileName);
+    if (profile === undefined) return undefined;
+    const activeToolNames = profile.tools;
+    const disallowedTools = profile.disallowedTools ?? [];
+    if (
+      sameNames(current.activeToolNames, activeToolNames) &&
+      sameNames(current.disallowedTools, disallowedTools)
+    ) {
+      return undefined;
+    }
+    return { activeToolNames, disallowedTools };
+  }
+
   bind(input: BindAgentInput): Promise<ProfileBindingSnapshot> {
     return this.bindInternal(input, this.defaultBinding, true);
   }
@@ -930,3 +946,11 @@ registerScopedService(
   ScopeActivation.OnScopeCreated,
   'profile',
 );
+
+function sameNames(
+  left: readonly string[] | undefined,
+  right: readonly string[] | undefined,
+): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  return left.length === right.length && left.every((name, index) => name === right[index]);
+}

@@ -230,6 +230,13 @@ export class AgentLoopProfileAdapter implements EffectiveProfileReader {
     const replacement = modelAlias === undefined ? undefined : this.discovery.retiredModelReplacement(modelAlias);
     if (replacement !== undefined) await this.setModel(replacement).catch(() => {});
     this.profile.afterConfigDispatch({ modelAlias: this.state.profile?.modelAlias }, this.snapshot());
+    const refreshed = await this.profile.refreshTools(this.snapshot());
+    if (refreshed !== undefined) {
+      this.applyUpdate(
+        refreshed,
+        this.profile.prepareUpdate(refreshed, this.snapshot(), refreshed.activeToolNames ?? null),
+      );
+    }
     await this.refreshBoundSubagentAllowlist();
   }
 }

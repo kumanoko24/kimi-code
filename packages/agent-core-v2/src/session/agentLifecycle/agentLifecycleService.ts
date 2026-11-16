@@ -45,6 +45,7 @@ import {
 import { abortError } from '#/_base/utils/abort';
 import { IAgentPermissionModeService } from '#/agent/permissionMode/permissionMode';
 import { IAgentPermissionRulesService } from '#/agent/permissionRules/permissionRules';
+import { IAgentChangeNotifierService } from '#/agent/changeNotifier/changeNotifier';
 
 import { historyFromContextPreservingToolNotes } from '#/agent/loop/history';
 import { closeTrailingOpenToolExchange } from '#/agent/contextMemory/openToolExchange';
@@ -75,6 +76,7 @@ import {
   type CreateAgentOptions,
   type ForkAgentOptions,
   IAgentLifecycleService,
+  MAIN_AGENT_ID,
 } from './agentLifecycle';
 
 let nextAgentId = 0;
@@ -310,6 +312,9 @@ export class AgentLifecycleService extends Disposable implements IAgentLifecycle
       await handle.accessor.get(IAgentToolActivationService).activate();
       stage = 'start';
       await loop.start(opts.initialTools);
+      if (agentId === MAIN_AGENT_ID) {
+        void handle.accessor.get(IAgentChangeNotifierService).notifyAgentsMdChanges();
+      }
       return agent;
     } catch (error) {
       this.telemetry.track2('agent_create_failed', {
