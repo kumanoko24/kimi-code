@@ -312,7 +312,7 @@ function encodeResponseFormat(format: ResponseFormat): Record<string, unknown> {
   };
 }
 
-const CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING = 128 * 1024;
+const CHAT_COMPLETIONS_MAX_OUTPUT_TOKENS_CEILING = 256_000;
 
 function usesMaxCompletionTokens(model: string): boolean {
   const normalized = model.toLowerCase();
