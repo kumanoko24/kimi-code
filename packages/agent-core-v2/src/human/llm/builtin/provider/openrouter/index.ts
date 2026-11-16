@@ -3,14 +3,38 @@ import { createRequester } from '#/llm/requester';
 import { openAIProtocol, lowerMessage } from '../../protocol/openai/index';
 import { createDecoder, type RawChunk } from '../../protocol/openai/decode';
 
+function isReasoningDetail(detail: unknown): detail is Record<string, unknown> {
+  if (typeof detail !== 'object' || detail === null || Array.isArray(detail)) return false;
+  const record = detail as Record<string, unknown>;
+  const id = record['id'];
+  const format = record['format'];
+  const index = record['index'];
+  if (id !== undefined && id !== null && typeof id !== 'string') return false;
+  if (format !== undefined && typeof format !== 'string') return false;
+  if (index !== undefined && typeof index !== 'number') return false;
+  switch (record['type']) {
+    case 'reasoning.summary':
+      return typeof record['summary'] === 'string';
+    case 'reasoning.encrypted':
+      return typeof record['data'] === 'string';
+    case 'reasoning.text':
+      return (
+        typeof record['text'] === 'string' &&
+        (record['signature'] === undefined ||
+          record['signature'] === null ||
+          typeof record['signature'] === 'string')
+      );
+    default:
+      return false;
+  }
+}
+
 function detailsOf(value: unknown): Record<string, unknown>[] | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const details = (value as Record<string, unknown>)['reasoning_details'];
   if (!Array.isArray(details)) return undefined;
-  if (details.some((part) => typeof part !== 'object' || part === null || Array.isArray(part))) {
-    throw new TypeError('OpenRouter returned invalid reasoning_details');
-  }
-  return details as Record<string, unknown>[];
+  const valid = details.filter(isReasoningDetail);
+  return valid.length === 0 ? undefined : valid;
 }
 
 function displayText(detail: Record<string, unknown>): string {
@@ -36,7 +60,12 @@ export const openRouterProtocol = openAIProtocol.with({
   maxOutputTokens: (cap) => ({ max_tokens: cap }),
   message: (message, module) => {
     const bundles = message.content.flatMap((part) =>
-      part.type === 'think' && part.openRouterReasoning !== undefined ? [part.openRouterReasoning] : [],
+      part.type === 'think' &&
+      part.openRouterReasoning !== undefined &&
+      part.openRouterReasoning.provider === module.model.spec.provider &&
+      part.openRouterReasoning.model === module.model.spec.name
+        ? [part.openRouterReasoning]
+        : [],
     );
     const content = bundles.length === 0 ? message.content : message.content.filter((part) => part.type !== 'think');
     const replayMessage = message.role === 'assistant'
