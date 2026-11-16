@@ -5,12 +5,12 @@
  * first stdout line. Runs are throttled and time-boxed; any failure (spawn
  * error, nonzero exit, timeout) yields null so the caller falls back to the
  * built-in layout. Mirrors Claude Code's statusLine contract at the seam:
- * JSON in, first line out, 300ms ceiling.
+ * JSON in, first line out, 1000ms ceiling.
  */
 
 import { spawn } from 'node:child_process';
 
-export const STATUS_LINE_COMMAND_TIMEOUT_MS = 300;
+export const STATUS_LINE_COMMAND_TIMEOUT_MS = 1_000;
 export const STATUS_LINE_RERUN_INTERVAL_MS = 1_000;
 export const STATUS_LINE_MAX_CAPTURE_BYTES = 65_536;
 
