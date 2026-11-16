@@ -3,6 +3,7 @@ import type { Readable } from 'node:stream';
 
 import type {
   PermissionOption,
+  PlanEntry,
   RequestPermissionRequest,
   RequestPermissionResponse,
   StopReason,
@@ -36,7 +37,7 @@ import { ISessionContext } from '#/session/sessionContext/sessionContext';
 import { resolveSubagentTimeoutMs } from '#/session/subagent/configSection';
 import { ISessionWorkspaceContext } from '#/session/workspaceContext/workspaceContext';
 
-import { openAcpSession, type AcpSession } from './acpClient';
+import { openAcpSession, type AcpSession, type AcpToolCallEvent } from './acpClient';
 import type { AcpAgentConfig } from './configSection';
 
 const STATUS_TEXT_TAIL_CHARS = 4_000;
@@ -49,9 +50,14 @@ export interface AcpWorkerInteraction {
   readonly toolCallId: string;
 }
 
+export interface AcpActivity {
+  readonly tools: readonly AcpToolCallEvent[];
+  readonly plan: readonly PlanEntry[];
+}
+
 export interface AcpTurnListeners {
   readonly onText?: (text: string) => void;
-  readonly onToolCall?: (title: string, status: string | undefined) => void;
+  readonly onActivity?: (activity: AcpActivity) => void;
 }
 
 export interface AcpTurnResult {
@@ -118,7 +124,9 @@ export const IAcpWorkerService = createDecorator<IAcpWorkerService>('acpWorkerSe
 interface Turn {
   readonly prompt: string;
   readonly controller: AbortController;
+  readonly tools: Map<string, AcpToolCallEvent>;
   listeners: AcpTurnListeners;
+  plan: readonly PlanEntry[];
   text: string;
   completion: Promise<AcpTurnResult>;
 }
@@ -216,8 +224,17 @@ export class AcpWorkerService extends Service implements IAcpWorkerService {
             turn.text += text;
             turn.listeners.onText?.(text);
           },
-          onToolCall: (title, status) => {
-            worker?.current?.listeners.onToolCall?.(title, status);
+          onToolCall: (call) => {
+            const turn = worker?.current;
+            if (turn === undefined) return;
+            turn.tools.set(call.id, call);
+            turn.listeners.onActivity?.({ tools: [...turn.tools.values()], plan: turn.plan });
+          },
+          onPlan: (entries) => {
+            const turn = worker?.current;
+            if (turn === undefined) return;
+            turn.plan = entries;
+            turn.listeners.onActivity?.({ tools: [...turn.tools.values()], plan: turn.plan });
           },
         }),
         openController.signal,
@@ -349,7 +366,9 @@ export class AcpWorkerService extends Service implements IAcpWorkerService {
     const turn: Turn = {
       prompt,
       controller,
+      tools: new Map(),
       listeners,
+      plan: [],
       text: '',
       completion: Promise.resolve({ prompt, text: '', stopReason: 'end_turn' }),
     };

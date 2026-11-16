@@ -11,7 +11,7 @@ import {
 } from '#/tool/toolContract';
 import { ACP_AGENTS_SECTION, type AcpAgentConfig, type AcpAgentsConfig } from './configSection';
 import { ACP_AGENT_FLAG_ID } from './flag';
-import { IAcpWorkerService, type AcpTurnListeners, type AcpTurnResult } from './acpWorkerService';
+import { IAcpWorkerService, type AcpActivity, type AcpTurnListeners, type AcpTurnResult } from './acpWorkerService';
 import {
   ACP_AGENT_TOOL_NAME,
   AcpAgentToolInputSchema,
@@ -253,14 +253,33 @@ function listenersOf(ctx: ExecutableToolContext): AcpTurnListeners {
     onText: (text) => {
       ctx.write?.(text);
     },
-    onToolCall: (title, status) => {
+    onActivity: (activity) => {
+      const lines = activity.tools.map(toolLine);
+      if (activity.plan.length > 0) {
+        const done = activity.plan.filter((entry) => entry.status === 'completed').length;
+        lines.push(`plan ${done}/${activity.plan.length}`);
+        for (const entry of activity.plan) lines.push(`${planBox(entry.status)} ${entry.content}`);
+      }
+      if (lines.length === 0) return;
       ctx.onUpdate?.({
         kind: 'status',
-        text: status === undefined ? title : `${title} · ${status}`,
+        text: lines.join('\n'),
         replace: true,
       });
     },
   };
+}
+
+function toolLine(call: AcpActivity['tools'][number]): string {
+  if (call.status === 'completed') return `[x] ${call.title}`;
+  if (call.status === 'failed') return `[!] ${call.title}`;
+  return `[>] ${call.title}`;
+}
+
+function planBox(status: AcpActivity['plan'][number]['status']): string {
+  if (status === 'completed') return '[x]';
+  if (status === 'in_progress') return '[>]';
+  return '[ ]';
 }
 
 function formatTurnResult(workerId: string, result: AcpTurnResult): ExecutableToolResult {

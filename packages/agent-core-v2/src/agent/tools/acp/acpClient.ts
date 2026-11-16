@@ -10,9 +10,16 @@ import {
   type StopReason,
   type ActiveSession,
   type ClientConnection,
+  type PlanEntry,
 } from '@agentclientprotocol/sdk';
 
 import type { IHostProcess } from '#/os/interface/hostProcess';
+
+export interface AcpToolCallEvent {
+  readonly id: string;
+  readonly title: string;
+  readonly status?: string;
+}
 
 export interface AcpSessionOptions {
   readonly process: IHostProcess;
@@ -23,7 +30,8 @@ export interface AcpSessionOptions {
     request: RequestPermissionRequest,
   ) => Promise<RequestPermissionResponse>;
   readonly onText: (text: string) => void;
-  readonly onToolCall: (title: string, status: string | undefined) => void;
+  readonly onToolCall: (call: AcpToolCallEvent) => void;
+  readonly onPlan: (entries: readonly PlanEntry[]) => void;
 }
 
 export interface AcpPromptResult {
@@ -40,6 +48,7 @@ export interface AcpSession {
 }
 
 export async function openAcpSession(options: AcpSessionOptions): Promise<AcpSession> {
+  const toolTitles = new Map<string, string>();
   const app = client({ name: 'kimi-code' })
     .onNotification(methods.client.session.update, (context) => {
       const update = context.params.update;
@@ -48,11 +57,27 @@ export async function openAcpSession(options: AcpSessionOptions): Promise<AcpSes
         return;
       }
       if (update.sessionUpdate === 'tool_call') {
-        options.onToolCall(update.title, update.status);
+        toolTitles.set(update.toolCallId, update.title);
+        options.onToolCall({
+          id: update.toolCallId,
+          title: update.title,
+          status: update.status ?? undefined,
+        });
         return;
       }
-      if (update.sessionUpdate === 'tool_call_update' && typeof update.title === 'string') {
-        options.onToolCall(update.title, update.status ?? undefined);
+      if (update.sessionUpdate === 'tool_call_update') {
+        const title = update.title ?? toolTitles.get(update.toolCallId);
+        if (title === undefined) return;
+        toolTitles.set(update.toolCallId, title);
+        options.onToolCall({
+          id: update.toolCallId,
+          title,
+          status: update.status ?? undefined,
+        });
+        return;
+      }
+      if (update.sessionUpdate === 'plan') {
+        options.onPlan(update.entries);
       }
     })
     .onRequest(methods.client.session.requestPermission, (context) =>
