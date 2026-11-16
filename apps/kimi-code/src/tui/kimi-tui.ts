@@ -480,6 +480,12 @@ export class KimiTUI {
    */
   public exitForegroundTask: ((exitCode: number) => Promise<void>) | undefined;
 
+  /**
+   * Relaunch request set by `/restart`; the runner re-execs the installed
+   * binary with this session after the TUI shuts down.
+   */
+  public exitRestart: { readonly sessionId?: string } | undefined;
+
   track(
     event: string,
     properties?: Parameters<KimiHarness['track']>[1],
@@ -3206,6 +3212,10 @@ export class KimiTUI {
 
   setExitForegroundTask(task: (exitCode: number) => Promise<void>): void {
     this.exitForegroundTask = task;
+  }
+
+  setExitRestart(sessionId: string | undefined): void {
+    this.exitRestart = { sessionId };
   }
 
   async getStartupMcpMs(): Promise<number> {

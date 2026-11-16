@@ -308,6 +308,13 @@ export const BUILTIN_SLASH_COMMANDS = [
     availability: 'always',
   },
   {
+    name: 'restart',
+    aliases: [],
+    description: 'Restart with the latest installed Kimi Code and resume this session',
+    priority: 60,
+    availability: 'idle-only',
+  },
+  {
     name: 'compact',
     aliases: [],
     description: 'Compact the conversation context',
@@ -344,7 +351,7 @@ export const BUILTIN_SLASH_COMMANDS = [
   },
   {
     name: 'title',
-    aliases: ['rename'],
+    aliases: ['rename', 'name'],
     description: 'Set or show session title',
     priority: 60,
     argumentHint: '<title>',

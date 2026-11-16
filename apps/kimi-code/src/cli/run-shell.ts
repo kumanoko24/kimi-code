@@ -1,5 +1,5 @@
-import { execFileSync, spawnSync } from 'node:child_process';
-import { homedir } from 'node:os';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { constants as osConstants, homedir } from 'node:os';
 
 import {
   createKimiHarness,
@@ -249,6 +249,44 @@ export async function runShell(
     process.off('unhandledRejection', onUnhandledRejection);
   };
 
+  const relaunchWithLatestBinary = (sessionId: string | undefined): Promise<never> => {
+    const args: string[] = [];
+    if (sessionId !== undefined && sessionId.length > 0) args.push('-S', sessionId);
+    for (const dir of opts.addDirs ?? []) args.push('--add-dir', dir);
+    for (const dir of opts.skillsDirs) args.push('--skills-dir', dir);
+    const script = process.argv[1];
+    const useScript = !detectNativeInstall() && script !== undefined;
+    // Replace the process image so the new TUI inherits the terminal without
+    // this process lingering as a parent (which would keep its locks open).
+    if (process.platform !== 'win32') {
+      try {
+        process.execve?.(
+          process.execPath,
+          [useScript ? 'node' : 'kimi', ...(useScript ? [script] : []), ...args],
+          process.env,
+        );
+      } catch (error) {
+        log.error('restart execve failed, falling back to spawn', { error: String(error) });
+      }
+    }
+    const spawnArgs = useScript ? [script, ...args] : args;
+    return new Promise<never>(() => {
+      const child = spawn(process.execPath, spawnArgs, {
+        stdio: 'inherit',
+        cwd: workDir,
+        env: process.env,
+      });
+      child.once('error', (error) => {
+        log.error('restart spawn failed', { error: String(error) });
+        process.exit(1);
+      });
+      child.once('exit', (code, signal) => {
+        const signo = signal === null ? 0 : (osConstants.signals[signal] ?? 0);
+        process.exit(code ?? (signo > 0 ? 128 + signo : 1));
+      });
+    });
+  };
+
   tui.onExit = async (exitCode = 0) => {
     const sessionId = tui.getCurrentSessionId();
     const hasContent = tui.hasSessionContent();
@@ -263,6 +301,13 @@ export async function runShell(
       await shutdownTelemetry({ timeoutMs: CLI_SHUTDOWN_TIMEOUT_MS });
     } catch {}
     const gutter = ' '.repeat(CHROME_GUTTER);
+    if (tui.exitRestart !== undefined) {
+      removeCrashHandlers();
+      restoreStty();
+      process.stdout.write(`${gutter}Restarting with the latest installed Kimi Code…\n`);
+      await relaunchWithLatestBinary(tui.exitRestart.sessionId);
+      return;
+    }
     process.stdout.write(`${gutter}Bye!\n`);
     const hints: string[] = [];
     if (sessionId !== '' && hasContent) {

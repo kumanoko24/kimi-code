@@ -54,6 +54,7 @@ import {
   type BuiltinSlashCommandName,
 } from './registry';
 import { handleReloadCommand, handleReloadTuiCommand } from './reload';
+import { handleRestartCommand } from './restart';
 import type { SkillListSession } from './skills';
 import {
   canRestoreSubmittedInput,
@@ -207,6 +208,11 @@ export interface SlashCommandHost {
    * until Ctrl+C.
    */
   setExitForegroundTask(task: (exitCode: number) => Promise<void>): void;
+  /**
+   * Relaunch the CLI with the latest installed binary after the TUI has shut
+   * down, resuming `sessionId` when set. Used by `/restart`.
+   */
+  setExitRestart(sessionId: string | undefined): void;
   showHelpPanel(): void;
   createNewSession(): Promise<void>;
   showSessionPicker(): Promise<void>;
@@ -478,6 +484,9 @@ async function handleBuiltInSlashCommand(
       return;
     case 'reload-tui':
       await handleReloadTuiCommand(host);
+      return;
+    case 'restart':
+      await handleRestartCommand(host);
       return;
     case 'editor':
       await handleEditorCommand(host, args);
