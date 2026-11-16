@@ -32,4 +32,5 @@ export interface ModelThinkingMetadata {
   readonly alwaysThinking?: boolean;
   readonly supportEfforts?: readonly string[];
   readonly defaultEffort?: string;
+  readonly effortMap?: Readonly<Record<string, string>>;
 }

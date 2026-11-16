@@ -44,6 +44,7 @@ export interface CatalogModelOverrides {
   readonly supportEfforts?: readonly string[];
   readonly defaultEffort?: string;
   readonly offEffort?: string;
+  readonly effortMap?: Readonly<Record<string, string>>;
   readonly alwaysThinking?: boolean;
 }
 
@@ -53,6 +54,7 @@ export interface CatalogModelDefinition extends LlmModel {
   readonly reasoningKey?: string;
   readonly supportEfforts?: readonly string[];
   readonly offEffort?: string;
+  readonly effortMap?: Readonly<Record<string, string>>;
   readonly alwaysThinking?: boolean;
   readonly protocol?: ProtocolName;
   readonly defaultEffort?: string;
@@ -710,6 +712,7 @@ function mergeModel(
     reasoningKey: record.reasoningKey,
     supportEfforts: record.supportEfforts,
     offEffort: record.offEffort,
+    effortMap: record.effortMap,
     alwaysThinking: record.alwaysThinking,
     protocol: record.protocol,
     defaultEffort: record.defaultEffort,

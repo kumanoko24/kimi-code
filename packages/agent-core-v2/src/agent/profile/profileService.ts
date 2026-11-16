@@ -11,6 +11,7 @@ import { type ModelRequestParams, type SamplingOptions } from '#/llm-adapter/mod
 import { IProtocolAdapterRegistry } from '#/llm-adapter/protocol/protocol';
 import {
   drivesThinkingThroughTraits,
+  mapThinkingEffort,
   modelSupportsThinkingEffort,
   normalizeRequestedThinkingEffort,
   resolveForcedThinkingEffort,
@@ -369,12 +370,10 @@ export class AgentProfileService extends Disposable implements IAgentProfileServ
   }
 
   resolveThinkingLevel(level: string, current?: ProfileBindingSnapshot): string {
-    this.assertThinkingEffortSupported(
-      level,
-      this.tryResolveRawModel(current?.modelAlias),
-      current?.modelAlias ?? '',
-    );
-    return normalizeRequestedThinkingEffort(level) ?? level;
+    const model = this.tryResolveRawModel(current?.modelAlias);
+    this.assertThinkingEffortSupported(level, model, current?.modelAlias ?? '');
+    const normalized = normalizeRequestedThinkingEffort(level) ?? level;
+    return mapThinkingEffort(normalized, model);
   }
 
   private assertThinkingEffortSupported(
@@ -383,7 +382,8 @@ export class AgentProfileService extends Disposable implements IAgentProfileServ
     modelAlias: string,
   ): void {
     const normalized = normalizeRequestedThinkingEffort(requested);
-    if (normalized === undefined || this.supportsThinkingEffort(normalized, model)) return;
+    if (normalized === undefined) return;
+    if (this.supportsThinkingEffort(mapThinkingEffort(normalized, model), model)) return;
     const efforts = model?.supportEfforts ?? [];
     const supported = efforts.length === 0 ? 'off' : ['off', ...efforts].join(', ');
     throw new ProfileError(
@@ -679,7 +679,7 @@ export class AgentProfileService extends Disposable implements IAgentProfileServ
       base,
       drivesThinkingThroughTraits(model?.providerType),
     );
-    return { effective: forced ?? base, forced };
+    return { effective: mapThinkingEffort(forced ?? base, model), forced };
   }
 
   private strictThinkingValidation(model: Model | undefined): boolean {

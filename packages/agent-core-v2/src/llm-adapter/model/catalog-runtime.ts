@@ -75,6 +75,7 @@ export function toCatalogModelDefinition(
     reasoningKey: record.reasoningKey,
     supportEfforts: record.supportEfforts,
     offEffort: record.offEffort,
+    effortMap: record.effortMap,
     alwaysThinking: declaresAlwaysThinking(record.capabilities),
     protocol: record.protocol,
     defaultEffort: record.defaultEffort,
@@ -102,6 +103,7 @@ function toCatalogOverrides(overrides: ModelOverride | undefined): CatalogModelO
   if (overrides.supportEfforts !== undefined) out.supportEfforts = overrides.supportEfforts;
   if (overrides.defaultEffort !== undefined) out.defaultEffort = overrides.defaultEffort;
   if (overrides.offEffort !== undefined) out.offEffort = overrides.offEffort;
+  if (overrides.effortMap !== undefined) out.effortMap = overrides.effortMap;
   if (overrides.capabilities !== undefined) {
     out.capability = capabilityFromDeclared(overrides.capabilities);
     out.alwaysThinking = declaresAlwaysThinking(overrides.capabilities);

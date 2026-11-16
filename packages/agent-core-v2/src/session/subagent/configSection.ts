@@ -14,6 +14,7 @@ import { THINKING_SECTION } from '#/app/kosongConfig/configSection';
 import type { IModelCatalog, Model } from '#/llm-adapter/model/catalog';
 import {
   declaredDefaultEffortForModel,
+  mapThinkingEffort,
   modelSupportsThinking,
   modelSupportsThinkingEffort,
   normalizeRequestedThinkingEffort,
@@ -200,7 +201,7 @@ function assertValidSubagentDefaultEffort(
         },
       );
     }
-    if (modelSupportsThinkingEffort(effort, model, true)) continue;
+    if (modelSupportsThinkingEffort(mapThinkingEffort(effort, model), model, true)) continue;
     if (!modelSupportsThinking(model)) {
       throw new Error2(
         ErrorCodes.CONFIG_INVALID,

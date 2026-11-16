@@ -25,6 +25,7 @@ export interface ModelOverride {
   supportEfforts?: string[];
   defaultEffort?: string;
   offEffort?: string;
+  effortMap?: Record<string, string>;
 }
 
 export interface ModelRecord {
@@ -53,6 +54,7 @@ export interface ModelRecord {
   supportEfforts?: string[];
   defaultEffort?: string;
   offEffort?: string;
+  effortMap?: Record<string, string>;
   upgrade?: ModelUpgrade;
 
   overrides?: ModelOverride;

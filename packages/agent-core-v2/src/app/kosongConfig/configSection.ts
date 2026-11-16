@@ -189,6 +189,7 @@ const ModelBaseSchema = z.object({
   supportEfforts: z.array(z.string()).optional(),
   defaultEffort: z.string().optional(),
   offEffort: z.string().optional(),
+  effortMap: z.record(z.string(), z.string()).optional(),
   upgrade: modelUpgradeSchema.optional(),
 });
 

@@ -26,6 +26,7 @@ export interface Model {
   readonly reasoningKey?: string;
   readonly supportEfforts?: readonly string[];
   readonly defaultEffort?: string;
+  readonly effortMap?: Readonly<Record<string, string>>;
   readonly alwaysThinking: boolean;
   readonly adaptiveThinking?: boolean;
   readonly providerType?: string;

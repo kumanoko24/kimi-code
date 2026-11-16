@@ -49,6 +49,7 @@ const modelBaseSchema = z.object({
   betaApi: z.boolean().optional(),
   supportEfforts: z.array(z.string()).optional(),
   defaultEffort: z.string().optional(),
+  effortMap: z.record(z.string(), z.string()).optional(),
 });
 
 const modelOverrideSchema = modelBaseSchema

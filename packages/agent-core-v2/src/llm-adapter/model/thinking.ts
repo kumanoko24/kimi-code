@@ -127,6 +127,15 @@ export function declaredDefaultEffortForModel(
   return effortsFor(model).includes(declared) ? (declared as ThinkingEffort) : undefined;
 }
 
+export function mapThinkingEffort(
+  effort: ThinkingEffort,
+  model: ModelThinkingMetadata | undefined,
+): ThinkingEffort {
+  if (effort === 'off') return effort;
+  const mapped = nonEmpty(model?.effortMap?.[effort])?.toLowerCase() as ThinkingEffort | undefined;
+  return mapped ?? effort;
+}
+
 export function modelSupportsThinkingEffort(
   effort: ThinkingEffort,
   model: ModelThinkingMetadata | undefined,
@@ -181,5 +190,5 @@ export function resolveThinkingEffortForModel(
         ? configured
         : defaultThinkingEffortForModel(model);
   }
-  return normalizeThinkingEffortForModel(effort, model, strictValidation);
+  return normalizeThinkingEffortForModel(mapThinkingEffort(effort, model), model, strictValidation);
 }

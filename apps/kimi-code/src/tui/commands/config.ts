@@ -260,6 +260,11 @@ export async function handleEffortCommand(host: SlashCommandHost, args: string):
     return;
   }
   if (!segments.includes(arg)) {
+    const mapped = effective.effortMap?.[arg];
+    if (mapped !== undefined && segments.includes(mapped)) {
+      await confirmThenPerformEffortSwitch(host, arg, 'model');
+      return;
+    }
     const providerType = host.state.appState.availableProviders[effective.provider]?.type;
     const protocol = effective.protocol ?? providerType;
     if (protocol !== 'anthropic') {

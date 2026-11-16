@@ -308,6 +308,7 @@ export class ModelCatalog extends Disposable implements IModelCatalog {
       reasoningKey: model.reasoningKey,
       supportEfforts: model.supportEfforts,
       defaultEffort: model.defaultEffort,
+      effortMap: model.effortMap,
       alwaysThinking: declared.has('always_thinking'),
       adaptiveThinking: model.adaptiveThinking,
       providerType,
@@ -459,6 +460,7 @@ function effectiveRecordOf(definition: CatalogModel): ModelRecord {
       definition.supportEfforts === undefined ? undefined : [...definition.supportEfforts],
     defaultEffort: definition.defaultEffort,
     offEffort: definition.offEffort,
+    effortMap: definition.effortMap,
   };
 }
 

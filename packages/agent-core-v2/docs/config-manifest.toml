@@ -335,6 +335,7 @@ merge_all_available_skills = true
   # support_efforts: string[]
   # default_effort: string
   # off_effort: string
+  # effort_map: record<string, string>
   # upgrade: object
     # model: string
     # migration_markdown: string
@@ -362,6 +363,7 @@ merge_all_available_skills = true
     # support_efforts: string[]
     # default_effort: string
     # off_effort: string
+    # effort_map: record<string, string>
 
 # ##########################################################################
 # peers

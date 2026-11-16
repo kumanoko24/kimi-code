@@ -159,6 +159,7 @@ Each entry in the `models` table defines a model alias (the name used in `defaul
 | `support_efforts` | `array<string>` | No | Thinking effort levels the model accepts; unsupported values fall back to `default_effort`, out-of-list values fail; managed refreshes may rewrite it (pin via overrides) |
 | `default_effort` | `string` | No | Default thinking effort for the model; managed and open-platform refreshes may rewrite it. Pin via [model overrides](#model-overrides) |
 | `off_effort` | `string` | No | Effort value sent on the wire to disable thinking (e.g. `none` for xai grok); the only way to actually stop reasoning on models that reason by default |
+| `effort_map` | `table<string, string>` | No | Per-model effort remapping: keys are requested efforts, values are sent instead (e.g. `{ xhigh = "max" }`); use it when the UI can select an effort the model does not support |
 | `upgrade` | `object` | No | Custom-registry upgrade declaration (`model`, `migration_markdown`, and optional `retirement_at`); managed refreshes rewrite it |
 | `base_url` | `string` | No | Per-model endpoint override (written by catalog imports); takes precedence over the provider's `base_url`, only effective together with `protocol` |
 | `display_name` | `string` | No | Name shown in the UI; falls back to `model` when unset |
@@ -190,7 +191,7 @@ max_context_size = 131072
 display_name = "Kimi for Coding (custom)"
 ```
 
-`[models."<alias>".overrides]` accepts ordinary model fields such as `max_context_size`, `max_input_size`, `max_output_size`, `capabilities`, `display_name`, `reasoning_key`, `adaptive_thinking`, `support_efforts`, `default_effort`, and `off_effort`. It does not accept identity / routing fields (`provider`, `model`, `protocol`, `beta_api`, and `base_url`) or registry-managed `upgrade` metadata.
+`[models."<alias>".overrides]` accepts ordinary model fields such as `max_context_size`, `max_input_size`, `max_output_size`, `capabilities`, `display_name`, `reasoning_key`, `adaptive_thinking`, `support_efforts`, `default_effort`, `off_effort`, and `effort_map`. It does not accept identity / routing fields (`provider`, `model`, `protocol`, `beta_api`, and `base_url`) or registry-managed `upgrade` metadata.
 
 You can also switch models temporarily without touching the config file: setting `KIMI_MODEL_*` environment variables synthesizes a temporary provider in memory that does not persist after restart. See [Define a model from environment variables](./env-vars.md#define-a-model-from-environment-variables-kimi-model).
 

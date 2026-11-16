@@ -26,13 +26,14 @@ export function isThinkingOn(effort: ThinkingEffort): boolean {
  */
 export function thinkingEffortToConfig(
   effort: ThinkingEffort,
-  model?: Pick<ModelAlias, 'supportEfforts' | 'defaultEffort'>,
+  model?: Pick<ModelAlias, 'supportEfforts' | 'defaultEffort' | 'effortMap'>,
 ): {
   enabled: boolean;
   effort?: string;
 } {
   if (effort === 'off') return { enabled: false };
   if (effort === 'on') return { enabled: true };
+  if (model?.effortMap?.[effort] !== undefined) return { enabled: true };
   const efforts = model?.supportEfforts;
   if (efforts !== undefined && efforts.includes(effort)) {
     const declared = model?.defaultEffort;
