@@ -11,6 +11,8 @@ import { abortable } from '#/_base/utils/abort';
 import { IAgentLoopService, type LoopNotifyEntry } from '#/agent/loop/loop';
 import type { ApprovalResponse } from '#/agent/interaction/approval';
 import { IAgentLifecycleService, MAIN_AGENT_ID } from '#/session/agentLifecycle/agentLifecycle';
+import { IAgentPermissionModeService } from '#/agent/permissionMode/permissionMode';
+import type { PermissionMode } from '#/agent/permissionPolicy/types';
 import { ILogService } from '#/_base/log/log';
 import { ISessionEventBus } from '#/app/event/eventBus';
 import { AgentStatusUpdated } from '#/agent/usage/usageEvents';
@@ -229,15 +231,17 @@ export class PeerService extends Service implements IPeerService {
         return;
       }
       if (policy === 'hold') {
-        if (this.bootstrap.args.nonInteractive === true) {
-          await archivePeerMessage(this.homeDir, this.self.sessionId, file, message.id, 'refused');
-          return;
-        }
-        const approval = await this.requestApproval(message);
-        if (approval === 'aborted') return;
-        if (approval === 'refused') {
-          await archivePeerMessage(this.homeDir, this.self.sessionId, file, message.id, 'refused');
-          return;
+        if (this.permissionMode() !== 'auto') {
+          if (this.bootstrap.args.nonInteractive === true) {
+            await archivePeerMessage(this.homeDir, this.self.sessionId, file, message.id, 'refused');
+            return;
+          }
+          const approval = await this.requestApproval(message);
+          if (approval === 'aborted') return;
+          if (approval === 'refused') {
+            await archivePeerMessage(this.homeDir, this.self.sessionId, file, message.id, 'refused');
+            return;
+          }
         }
       } else if (policy !== 'accept') {
         await archivePeerMessage(this.homeDir, this.self.sessionId, file, message.id, 'refused');
@@ -255,6 +259,16 @@ export class PeerService extends Service implements IPeerService {
       }
     } finally {
       this.inFlight.delete(file);
+    }
+  }
+
+  private permissionMode(): PermissionMode | undefined {
+    const handle = this.lifecycle.handleOf(MAIN_AGENT_ID);
+    if (handle === undefined) return undefined;
+    try {
+      return handle.accessor.get(IAgentPermissionModeService).mode;
+    } catch {
+      return undefined;
     }
   }
 
