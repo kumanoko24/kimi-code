@@ -1,4 +1,6 @@
 import {
+  CHATGPT_PROVIDER_NAME,
+  chatGPTAccountId,
   applyOpenPlatformConfig,
   fetchOpenPlatformModels,
   filterModelsByPrefix,
@@ -20,8 +22,10 @@ import {
   refreshKimiRegion,
 } from '#/utils/region';
 import type { LoginProgressSpinnerHandle } from '../types';
+import { openUrl } from '#/utils/open-url';
 import {
   promptApiKey,
+  promptChatGPTAccountSelection,
   promptLogoutProviderSelection,
   promptModelSelectionForOpenPlatform,
   promptPlatformSelection,
@@ -38,6 +42,10 @@ export async function handleLoginCommand(host: SlashCommandHost): Promise<void> 
     const platformId = await promptPlatformSelection(host);
     if (platformId === undefined) return;
 
+    if (platformId === CHATGPT_PROVIDER_NAME) {
+      await handleChatGPTLogin(host);
+      return;
+    }
     if (platformId === 'kimi-code' || platformId === KIMI_CODE_GLOBAL_PLATFORM_VALUE) {
       const region: KimiRegion = platformId === KIMI_CODE_GLOBAL_PLATFORM_VALUE ? 'global' : 'mainland-cn';
       await handleKimiCodeOAuthLogin(host, region);
@@ -49,6 +57,39 @@ export async function handleLoginCommand(host: SlashCommandHost): Promise<void> 
     await handleOpenPlatformLogin(host, platform);
   } finally {
     releaseAuthBlock();
+  }
+}
+
+async function handleChatGPTLogin(host: SlashCommandHost): Promise<void> {
+  const accounts = await host.harness.auth.listChatGPTAccounts();
+  const choice = accounts.length === 0 ? '' : await promptChatGPTAccountSelection(host, accounts);
+  if (choice === undefined) return;
+  const controller = new AbortController();
+  host.cancelInFlight = () => {
+    controller.abort();
+  };
+  let spinner: LoginProgressSpinnerHandle | undefined;
+  try {
+    await host.harness.auth.loginWithChatGPT({
+      account: choice || undefined,
+      signal: controller.signal,
+      onBrowserUrl: (url) => {
+        host.showStatus(`Open ${url} in a browser on this machine. Ctrl-C cancels sign-in.`);
+        openUrl(url);
+        spinner = host.showLoginProgressSpinner('Waiting for ChatGPT authorization…');
+      },
+    });
+  } catch (error) {
+    spinner?.stop({ ok: false, label: controller.signal.aborted ? 'Sign-in cancelled.' : 'Sign-in failed.' });
+    if (!controller.signal.aborted) host.showError(formatErrorMessage(error));
+    return;
+  } finally {
+    host.cancelInFlight = undefined;
+  }
+  spinner?.stop({ ok: true, label: 'Signed in with ChatGPT.' });
+  await host.authFlow.refreshAvailableModels();
+  if (host.state.appState.availableModels[host.state.appState.model] === undefined) {
+    await host.authFlow.refreshConfigAfterLogin();
   }
 }
 
@@ -211,10 +252,11 @@ export async function handleLogoutCommand(host: SlashCommandHost): Promise<void>
     (p) => p.providerName === DEFAULT_OAUTH_PROVIDER_NAME && p.hasToken,
   );
   const config = await host.harness.getConfig();
+  const hasChatGPT = chatGPTAccountId(config.providers[CHATGPT_PROVIDER_NAME]?.oauth?.key) !== undefined;
   const hasManagedRemnant =
     hasOAuthToken || config.providers[DEFAULT_OAUTH_PROVIDER_NAME] !== undefined;
   const apiKeyProviderIds = Object.keys(config.providers ?? {})
-    .filter((id) => id !== DEFAULT_OAUTH_PROVIDER_NAME)
+    .filter((id) => id !== DEFAULT_OAUTH_PROVIDER_NAME && !(hasChatGPT && id === CHATGPT_PROVIDER_NAME))
     .toSorted();
 
   const options: ChoiceOption[] = [];
@@ -224,6 +266,9 @@ export async function handleLogoutCommand(host: SlashCommandHost): Promise<void>
       label: PRODUCT_NAME,
       description: 'OAuth login',
     });
+  }
+  if (hasChatGPT) {
+    options.push({ value: CHATGPT_PROVIDER_NAME, label: 'ChatGPT', description: 'OAuth login' });
   }
   for (const id of apiKeyProviderIds) {
     const baseUrl = config.providers[id]?.baseUrl;
@@ -245,8 +290,14 @@ export async function handleLogoutCommand(host: SlashCommandHost): Promise<void>
   const target = await promptLogoutProviderSelection(host, options, currentProvider);
   if (target === undefined) return;
 
+  const isChatGPTLogout = target === CHATGPT_PROVIDER_NAME && hasChatGPT;
   if (target === DEFAULT_OAUTH_PROVIDER_NAME) {
     await host.harness.auth.logout(DEFAULT_OAUTH_PROVIDER_NAME);
+  } else if (isChatGPTLogout) {
+    const result = await host.harness.auth.logoutChatGPT();
+    if (result.revocationConfirmed === false) {
+      host.showError('OpenAI revocation could not be confirmed. Disconnect the app in ChatGPT Settings.');
+    }
   } else {
     await host.harness.removeProvider(target);
   }
@@ -260,7 +311,7 @@ export async function handleLogoutCommand(host: SlashCommandHost): Promise<void>
       availableProviders: updated.providers ?? {},
     });
   }
-  refreshKimiRegion();
+  if (!isChatGPTLogout) refreshKimiRegion();
 
   host.track('logout', { provider: target });
   const label = target === DEFAULT_OAUTH_PROVIDER_NAME ? PRODUCT_NAME : target;

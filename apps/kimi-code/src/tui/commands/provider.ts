@@ -10,6 +10,7 @@ import {
   type RefreshProviderModelsResponse,
   type ThinkingEffort,
 } from '@moonshot-ai/kimi-code-sdk';
+import { chatGPTAccountId } from '@moonshot-ai/kimi-code-oauth';
 
 import { createKimiCodeUserAgent } from '#/cli/host-identity';
 import { fetchCatalogOrBuiltIn } from '#/utils/catalog-fetch';
@@ -121,7 +122,10 @@ function buildProviderManagerOptions(host: SlashCommandHost): ProviderManagerOpt
   const activeProviderId =
     host.state.appState.availableModels[host.state.appState.model]?.provider;
   return {
-    providers: host.state.appState.availableProviders,
+    providers: Object.fromEntries(
+      Object.entries(host.state.appState.availableProviders).filter(([, provider]) =>
+        chatGPTAccountId(provider.oauth?.key) === undefined),
+    ),
     activeProviderId,
     onAdd: () => {
       void handleProviderAdd(host).catch((error: unknown) => {

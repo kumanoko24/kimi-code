@@ -9,6 +9,12 @@ import {
 import {
   applyManagedKimiCodeConfig,
   applyManagedKimiCodeLogoutConfig,
+  CHATGPT_API_BASE_URL,
+  CHATGPT_OAUTH_KEY_PREFIX,
+  CHATGPT_PROVIDER_NAME,
+  ChatGPTSessions,
+  CUSTOM_REGISTRY_DEFAULT_MAX_CONTEXT,
+  chatGPTAccountId,
   KIMI_CODE_PROVIDER_NAME,
   KimiOAuthToolkit,
   kimiRegionLoginHosts,
@@ -17,6 +23,7 @@ import {
   type AuthManagedUsageResult,
   type AuthStatus,
   type BearerTokenProvider,
+  type ChatGPTLoginOptions,
   type KimiHostIdentity,
   type KimiOAuthLoginOptions,
   type KimiRegion,
@@ -48,6 +55,7 @@ export interface KimiAuthLoginResult {
 export interface KimiAuthLogoutResult {
   readonly providerName: string;
   readonly ok: true;
+  readonly revocationConfirmed?: boolean;
 }
 
 export interface KimiAuthFacadeOptions {
@@ -62,8 +70,10 @@ type SDKManagedConfig = KimiConfig & ManagedKimiConfigShape;
 
 export class KimiAuthFacade {
   private readonly toolkit: KimiOAuthToolkit<SDKManagedConfig>;
+  private readonly chatGPT: ChatGPTSessions;
 
   constructor(private readonly options: KimiAuthFacadeOptions) {
+    this.chatGPT = new ChatGPTSessions(options.homeDir);
     this.toolkit = new KimiOAuthToolkit<SDKManagedConfig>({
       homeDir: options.homeDir,
       identity: options.identity,
@@ -83,7 +93,67 @@ export class KimiAuthFacade {
   }
 
   async status(providerName?: string | undefined): Promise<AuthStatus> {
+    const accountId = providerName === CHATGPT_PROVIDER_NAME ? this.activeChatGPTAccount() : undefined;
+    if (accountId !== undefined) {
+      return {
+        providers: [{
+          providerName: CHATGPT_PROVIDER_NAME,
+          hasToken: (await this.chatGPT.getCachedAccessToken(accountId)) !== undefined,
+        }],
+      };
+    }
     return this.toolkit.status(providerName, this.resolveRuntimeManagedAuth(providerName).oauthRef);
+  }
+
+  async listChatGPTAccounts() {
+    const active = this.activeChatGPTAccount();
+    return (await this.chatGPT.list()).map((account) => ({ ...account, active: account.id === active }));
+  }
+
+  async loginWithChatGPT(options: ChatGPTLoginOptions): Promise<void> {
+    const path = this.options.configPath;
+    const checkProvider = (config: KimiConfig): void => {
+      const provider = config.providers[CHATGPT_PROVIDER_NAME];
+      if (provider !== undefined && chatGPTAccountId(provider.oauth?.key) === undefined) {
+        throw new Error('A custom provider already uses the name "chatgpt". Rename that provider before using Sign in with ChatGPT.');
+      }
+    };
+    checkProvider(readConfigFileForUpdate(path));
+    await this.chatGPT.login(options, async (accountId, models) => {
+      const config = readConfigFileForUpdate(path);
+      checkProvider(config);
+      const aliases = (config.models ??= {});
+      const available = new Set(models.map(({ slug }) => slug));
+      for (const [alias, model] of Object.entries(aliases)) {
+        if (model.provider === CHATGPT_PROVIDER_NAME && !available.has(model.model)) delete aliases[alias];
+      }
+      config.providers[CHATGPT_PROVIDER_NAME] = {
+        type: 'openai_responses',
+        baseUrl: CHATGPT_API_BASE_URL,
+        oauth: { storage: 'file', key: CHATGPT_OAUTH_KEY_PREFIX + accountId },
+      };
+      let firstModel: string | undefined;
+      for (const model of models) {
+        const alias = `${CHATGPT_PROVIDER_NAME}/${model.slug}`;
+        const previous = aliases[alias];
+        if (previous !== undefined && (previous.provider !== CHATGPT_PROVIDER_NAME || previous.model !== model.slug)) {
+          throw new Error(`A configured model already uses the alias "${alias}".`);
+        }
+        aliases[alias] = previous ?? {
+          provider: CHATGPT_PROVIDER_NAME,
+          model: model.slug,
+          displayName: model.displayName,
+          maxContextSize: model.contextWindow ?? CUSTOM_REGISTRY_DEFAULT_MAX_CONTEXT,
+        };
+        firstModel ??= alias;
+      }
+      if (config.defaultModel === undefined || aliases[config.defaultModel] === undefined) {
+        config.defaultModel = firstModel;
+        config.thinking = undefined;
+      }
+      await writeConfigFile(path, config);
+    });
+    this.options.onConfigUpdated?.(readConfigFile(path));
   }
 
   async login(
@@ -121,6 +191,9 @@ export class KimiAuthFacade {
   }
 
   async logout(providerName?: string | undefined): Promise<KimiAuthLogoutResult> {
+    if (providerName === CHATGPT_PROVIDER_NAME && this.activeChatGPTAccount() !== undefined) {
+      return this.logoutChatGPT();
+    }
     const result = await this.toolkit.logout(
       providerName,
       this.resolveRuntimeManagedAuth(providerName).oauthRef,
@@ -131,6 +204,22 @@ export class KimiAuthFacade {
       providerName: result.providerName,
       ok: result.ok,
     };
+  }
+
+  async logoutChatGPT(): Promise<KimiAuthLogoutResult> {
+    const providerName = CHATGPT_PROVIDER_NAME;
+    const path = this.options.configPath;
+    const current = readConfigFileForUpdate(path);
+    const accountId = chatGPTAccountId(current.providers[providerName]?.oauth?.key);
+    if (accountId === undefined) return { providerName, ok: true };
+    const revocationConfirmed = await this.chatGPT.logout(accountId, async () => {
+      const config = readConfigFileForUpdate(path);
+      if (chatGPTAccountId(config.providers[providerName]?.oauth?.key) !== accountId) return;
+      removeChatGPTModels(config);
+      await writeConfigFile(path, config);
+    });
+    this.options.onConfigUpdated?.(readConfigFile(path));
+    return { providerName, ok: true, revocationConfirmed };
   }
 
   async getManagedUsage(providerName?: string | undefined): Promise<AuthManagedUsageResult> {
@@ -188,6 +277,10 @@ export class KimiAuthFacade {
     };
   }
 
+  private activeChatGPTAccount(): string | undefined {
+    return chatGPTAccountId(this.resolveManagedAuth(CHATGPT_PROVIDER_NAME).oauthRef?.key);
+  }
+
   private resolveRuntimeManagedAuth(providerName?: string | undefined): {
     readonly oauthRef: OAuthRef;
     readonly baseUrl?: string | undefined;
@@ -210,4 +303,18 @@ export class KimiAuthFacade {
       configuredOAuthRef: oauthRef ?? auth.oauthRef,
     }).oauthRef;
   }
+}
+
+function removeChatGPTModels(config: KimiConfig): void {
+  delete config.providers[CHATGPT_PROVIDER_NAME];
+  if (config.models !== undefined) {
+    for (const [alias, model] of Object.entries(config.models)) {
+      if (model.provider === CHATGPT_PROVIDER_NAME) delete config.models[alias];
+    }
+  }
+  if (config.defaultModel !== undefined && config.models?.[config.defaultModel] === undefined) {
+    config.defaultModel = undefined;
+    config.thinking = undefined;
+  }
+  if (config.defaultProvider === CHATGPT_PROVIDER_NAME) config.defaultProvider = undefined;
 }

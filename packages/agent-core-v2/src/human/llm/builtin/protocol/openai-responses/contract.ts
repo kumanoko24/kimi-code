@@ -7,7 +7,7 @@ export type ResponsesInputContentItem =
 
 export type ResponsesInputItem =
   | { type: 'message'; role: string; content: ResponsesInputContentItem[] }
-  | { type: 'function_call'; call_id: string; name: string; arguments: string }
+  | { type: 'function_call'; call_id: string; name: string; arguments: string; namespace?: string }
   | { type: 'function_call_output'; call_id: string; output: string | ResponsesInputContentItem[] }
   | {
       type: 'reasoning';

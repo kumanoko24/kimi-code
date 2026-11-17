@@ -147,7 +147,19 @@ kimi -p "List changed files" --output-format stream-json
 kimi login
 ```
 
-该子命令没有任何 flag。在轮询期间随时按 `Ctrl-C` 可取消登录；取消或失败时退出码为 `1`，成功为 `0`。
+使用 `--region mainland-cn` 或 `--region global` 可选择 Kimi Code 登录区域。按 `Ctrl-C` 可取消。取消或失败时退出码为 `1`，成功为 `0`。
+
+使用 [Sign in with ChatGPT](../configuration/providers.md#sign-in-with-chatgpt) 时，先启用实验功能，再在同一台设备的浏览器中授权。重新登录已保存的账号时，先查看账号列表，找到对应的编号。
+
+```sh
+export KIMI_CODE_EXPERIMENTAL_CHATGPT_SIGN_IN=1
+kimi login --provider chatgpt
+kimi login --provider chatgpt --list-accounts
+kimi login --provider chatgpt --account 1
+kimi logout --provider chatgpt
+```
+
+退出时会清除本地 token，并尝试向 OpenAI 撤销当前会话。如果终端提示无法确认撤销，请在 ChatGPT 设置中断开该应用。
 
 ### `kimi acp`
 

@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI, { APIError } from 'openai';
 
 import type { ResolvedEndpoint } from '#/llm/endpoint';
 import { headersToRecord, requestIdFromHeader } from '#/llm/protocol/kit/http';
@@ -6,7 +6,7 @@ import { defineProtocol, type ToolMessageConversion } from '#/llm/protocol/proto
 
 import { decodeError } from '../openai/decode';
 import { getOpenAIResponsesModelCapability } from './capability';
-import { createDecoder, replay, type RawChunk, type RawResponse } from './decode';
+import { createDecoder, chatGPTPlanError, replay, type RawChunk, type RawResponse } from './decode';
 import type { OpenAIResponsesExtraParams } from './extra-params';
 import {
   openAIResponsesPipeline,
@@ -31,6 +31,7 @@ export {
 } from './lower';
 
 export interface OpenAIResponsesOptions {
+  readonly chatGPTPlan?: boolean;
   readonly extras?: OpenAIResponsesExtraParams;
   readonly toolMessageConversion?: ToolMessageConversion;
 }
@@ -76,5 +77,16 @@ export const openAIResponsesProtocol = defineProtocol<
   decoder: (_module, sink) => createDecoder(sink),
   replay: (response: RawResponse) => replay(response),
   requestId: requestIdFromHeader('x-request-id'),
-  decodeError,
+  decodeError: (error, source) => {
+    if (error instanceof APIError) {
+      const mapped = chatGPTPlanError(error.code ?? null, error.message, {
+        statusCode: error.status,
+        requestId: error.requestID ?? null,
+        headers: headersToRecord(error.headers) ?? null,
+        retryAfterMs: null,
+      });
+      if (mapped !== undefined) return mapped;
+    }
+    return decodeError(error, source);
+  },
 });

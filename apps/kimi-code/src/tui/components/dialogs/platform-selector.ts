@@ -1,8 +1,9 @@
-import { OPEN_PLATFORMS } from '@moonshot-ai/kimi-code-oauth';
+import { CHATGPT_PROVIDER_NAME, CHATGPT_SIGN_IN_FLAG, OPEN_PLATFORMS } from '@moonshot-ai/kimi-code-oauth';
 
 import { KIMI_CODE_GLOBAL_PLATFORM_VALUE } from '#/utils/region';
 
 import { ChoicePickerComponent, type ChoiceOption } from './choice-picker';
+import { isExperimentalFlagEnabled } from '../../commands/experimental-flags';
 
 const KIMI_CODE_MAINLAND_CN_OPTION: ChoiceOption = {
   value: 'kimi-code',
@@ -14,11 +15,15 @@ const KIMI_CODE_GLOBAL_OPTION: ChoiceOption = {
 };
 
 function platformOptions(): readonly ChoiceOption[] {
-  return [
+  const options = [
     KIMI_CODE_MAINLAND_CN_OPTION,
     KIMI_CODE_GLOBAL_OPTION,
     ...OPEN_PLATFORMS.map((platform) => ({ value: platform.id, label: platform.name })),
   ];
+  if (isExperimentalFlagEnabled(CHATGPT_SIGN_IN_FLAG)) {
+    options.push({ value: CHATGPT_PROVIDER_NAME, label: 'Sign in with ChatGPT' });
+  }
+  return options;
 }
 
 export interface PlatformSelectorOptions {

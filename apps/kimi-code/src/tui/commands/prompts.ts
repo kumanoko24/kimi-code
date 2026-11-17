@@ -69,6 +69,32 @@ export function promptLogoutProviderSelection(
   });
 }
 
+export function promptChatGPTAccountSelection(
+  host: SlashCommandHost,
+  accounts: readonly { id: string; label: string; active: boolean; connected: boolean }[],
+): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const select = (value?: string): void => {
+      host.restoreEditor();
+      resolve(value);
+    };
+    host.mountEditorReplacement(new ChoicePickerComponent({
+      title: 'Select a ChatGPT account',
+      options: [
+        ...accounts.map((account) => ({ value: account.id, label: account.label })),
+        { value: '', label: 'Add a ChatGPT account' },
+      ],
+      currentValue: accounts.find((account) => account.active && account.connected)?.id,
+      onSelect: select,
+      onCancel: () => {
+        select();
+      },
+    }), undefined, () => {
+      resolve(undefined);
+    });
+  });
+}
+
 export interface FeedbackPromptResult {
   readonly value: string;
 }

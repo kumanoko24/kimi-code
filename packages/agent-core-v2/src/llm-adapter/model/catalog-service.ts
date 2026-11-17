@@ -1,4 +1,9 @@
-import { parseKimiCodeCustomHeaders } from '@moonshot-ai/kimi-code-oauth';
+import {
+  CHATGPT_API_BASE_URL,
+  CHATGPT_PROVIDER_NAME,
+  chatGPTAccountId,
+  parseKimiCodeCustomHeaders,
+} from '@moonshot-ai/kimi-code-oauth';
 import {
   apiKeyEnvMissingMessage,
   declaredProviderCredential,
@@ -250,6 +255,18 @@ export class ModelCatalog extends Disposable implements IModelCatalog {
       provider: providerConfig,
       providerName,
     });
+    const chatGPTPlan = chatGPTAccountId(auth.oauth?.key) !== undefined;
+    if (chatGPTPlan && (
+      providerName !== CHATGPT_PROVIDER_NAME ||
+      providerConfig?.type !== 'openai_responses' ||
+      protocol !== 'openai_responses' ||
+      rawBaseUrl !== CHATGPT_API_BASE_URL
+    )) {
+      throw new Error2(
+        CONFIG_INVALID_ERROR_CODE,
+        'ChatGPT plan credentials require the ChatGPT provider and the official OpenAI Responses endpoint.',
+      );
+    }
     const credentialProvider = this.buildCredentialProvider(providerName, auth);
 
     const providerType = providerConfig?.type ?? protocol;
@@ -295,12 +312,14 @@ export class ModelCatalog extends Disposable implements IModelCatalog {
       aliases: model.aliases ?? [],
       protocol,
       baseUrl: resolvedBaseUrl,
-      headers: resolveOutboundHeaders(
+      headers: chatGPTPlan ? {} : resolveOutboundHeaders(
         providerConfig?.type,
         providerConfig?.customHeaders,
         this.hostRequestHeaders,
       ),
-      capabilities,
+      capabilities: chatGPTPlan
+        ? { ...capabilities, audio_in: false, video_in: false, dynamically_loaded_tools: false }
+        : capabilities,
       maxContextSize: model.maxContextSize,
       maxInputSize: model.maxInputSize,
       maxOutputSize: model.maxOutputSize,
@@ -314,7 +333,7 @@ export class ModelCatalog extends Disposable implements IModelCatalog {
       providerType,
       providerName,
       credentialProvider,
-      providerOptions,
+      providerOptions: chatGPTPlan ? { ...providerOptions, chatGPTPlan } : providerOptions,
     };
   }
 

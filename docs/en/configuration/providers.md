@@ -216,6 +216,14 @@ base_url = "https://api.openai.com/v1"
 api_key = "sk-xxxxx"
 ```
 
+### Sign in with ChatGPT
+
+To use an eligible ChatGPT plan, start Kimi Code CLI with `KIMI_CODE_EXPERIMENTAL_CHATGPT_SIGN_IN=1`. Run `/login`, select **Sign in with ChatGPT**, and approve plan usage in the browser on the same machine. Use `/model` to select a model from your account's catalog. To switch accounts or renew access, select a saved account in `/login`. Select ChatGPT in `/logout` to end the active session.
+
+For terminal commands, see [`kimi login`](../reference/kimi-command.md#kimi-login). Review plan limits and app access in [ChatGPT Settings → Usage](https://chatgpt.com/settings/usage).
+
+Switching accounts updates the ChatGPT model list. Future requests for ChatGPT models, including requests in existing Kimi sessions, use the selected account.
+
 ## `google-genai`
 
 For connecting directly to the Google Gemini API. Thinking, vision, and multimodal capabilities are auto-detected by model name.

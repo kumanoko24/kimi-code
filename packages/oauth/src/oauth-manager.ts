@@ -17,6 +17,7 @@ import { dirname } from 'node:path';
 
 import lockfile from 'proper-lockfile';
 
+import { DEFAULT_OAUTH_LOGIN_TIMEOUT_MS, OAUTH_FILE_LOCK_OPTIONS } from './constants';
 import { DeviceCodeTimeoutError, OAuthAccessDeniedError, OAuthError, OAuthUnauthorizedError } from './errors';
 import { pollDeviceToken, refreshAccessToken, requestDeviceAuthorization } from './oauth';
 import type { DevicePollResult, RefreshOptions } from './oauth';
@@ -26,7 +27,6 @@ import type { DeviceAuthorization, OAuthFlowConfig, OAuthRequestHeaders, TokenIn
 
 const MIN_REFRESH_THRESHOLD_SECONDS = 300;
 const REFRESH_THRESHOLD_RATIO = 0.5;
-const DEFAULT_DEVICE_CODE_TIMEOUT_MS = 15 * 60 * 1000;
 
 export function defaultRefreshThreshold(expiresIn: number): number {
   if (expiresIn > 0) {
@@ -122,7 +122,7 @@ export class OAuthManager {
     this.config = options.config;
     this.storage = options.storage;
     this.refreshThresholdFn = options.refreshThreshold ?? defaultRefreshThreshold;
-    this.deviceCodeTimeoutMs = options.deviceCodeTimeoutMs ?? DEFAULT_DEVICE_CODE_TIMEOUT_MS;
+    this.deviceCodeTimeoutMs = options.deviceCodeTimeoutMs ?? DEFAULT_OAUTH_LOGIN_TIMEOUT_MS;
     this.now = options.now ?? (() => Math.floor(Date.now() / 1000));
     this.sleep = options.sleep ?? defaultSleep;
     this.deviceHeaders = options.deviceHeaders;
@@ -213,11 +213,7 @@ export class OAuthManager {
     }
 
     try {
-      const release = await lockfile.lock(target, {
-        retries: { retries: 120, factor: 1, minTimeout: 500, maxTimeout: 1_000 },
-        stale: 5_000,
-        realpath: false,
-      });
+      const release = await lockfile.lock(target, OAUTH_FILE_LOCK_OPTIONS);
       return async () => {
         try {
           await release();

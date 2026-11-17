@@ -12,7 +12,7 @@ import { registerExportCommand } from './sub/export';
 import { registerForkCommand } from './sub/fork';
 import { registerAppCommand } from './sub/app';
 import { registerInstallDesktopCommand } from './sub/install-desktop';
-import { registerLoginCommand } from './sub/login';
+import { registerLoginCommand, registerLogoutCommand } from './sub/login';
 import { registerProviderCommand } from './sub/provider';
 import { registerSessionCommand } from './sub/session';
 import { registerVisCommand } from './sub/vis';
@@ -149,6 +149,7 @@ export function createProgram(
   registerAcpCommand(program);
   registerWebCommand(program);
   registerLoginCommand(program);
+  registerLogoutCommand(program);
   registerDoctorCommand(program);
   registerVisCommand(program);
   registerInstallDesktopCommand(program);

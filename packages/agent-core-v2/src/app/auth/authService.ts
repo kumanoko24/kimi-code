@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  CHATGPT_PROVIDER_NAME,
+  chatGPTAccountId,
   DeviceCodeTimeoutError,
   KIMI_CODE_PLATFORM_ID,
   KIMI_CODE_PROVIDER_NAME,
@@ -21,6 +23,7 @@ import {
   type KimiRegion,
   type ManagedKimiConfigShape,
 } from '@moonshot-ai/kimi-code-oauth';
+import './chatgptFlag';
 import { declaredProviderCredential } from '@moonshot-ai/kimi-code-oauth/provider-credential';
 import type {
   OAuthFlowSnapshot,
@@ -49,6 +52,7 @@ import {
   type ModelReadyFailureReason,
 } from '#/llm-adapter/model/model-auth';
 import { IModelService, type ModelRecord } from '#/llm-adapter/model/model';
+import { IModelOAuthTokens } from '#/llm-adapter/model/model-oauth';
 import {
   DEFAULT_MODEL_SECTION,
   MODELS_SECTION,
@@ -129,6 +133,9 @@ export class OAuthService extends Disposable implements IOAuthService {
   ): Promise<OAuthFlowStart> {
     this.log.info('oauth startLogin: enter', { provider });
     const configured = this.providerService.get(provider);
+    if (provider === CHATGPT_PROVIDER_NAME && chatGPTAccountId(configured?.oauth?.key) !== undefined) {
+      throw new OAuthError('Run kimi login --provider chatgpt to sign in with ChatGPT.');
+    }
     const region =
       options.region ??
       (provider === KIMI_CODE_PROVIDER_NAME &&
@@ -248,6 +255,9 @@ export class OAuthService extends Disposable implements IOAuthService {
   }
 
   async logout(provider = KIMI_CODE_PROVIDER_NAME): Promise<OAuthLogoutResponse> {
+    if (provider === CHATGPT_PROVIDER_NAME && chatGPTAccountId(this.readOAuthRefOptional(provider)?.key) !== undefined) {
+      throw new OAuthError('Run kimi logout --provider chatgpt to sign out of ChatGPT.');
+    }
     const oauthRef =
       provider === KIMI_CODE_PROVIDER_NAME
         ? this.resolveRuntimeOAuthRef(provider)
@@ -671,6 +681,7 @@ export class AuthSummaryService implements IAuthSummaryService {
     @IModelService private readonly modelService: IModelService,
     @IConfigService private readonly config: IConfigService,
     @IOAuthService private readonly oauth: IOAuthService,
+    @IModelOAuthTokens private readonly modelTokens: IModelOAuthTokens,
     @ITelemetryService private readonly telemetry: ITelemetryService,
     @ILogService private readonly log: ILogService,
   ) {}
@@ -685,9 +696,15 @@ export class AuthSummaryService implements IAuthSummaryService {
       oauthProviders: oauthProviders.map(([name]) => name),
     });
     const statuses: AuthStatus[] = [];
-    for (const [name] of oauthProviders) {
+    for (const [name, config] of oauthProviders) {
       try {
-        statuses.push(await this.oauth.status(name));
+        const ref = config.oauth;
+        if (ref !== undefined && chatGPTAccountId(ref.key) !== undefined) {
+          const loggedIn = await this.modelTokens.hasCachedAccessToken(name, ref);
+          statuses.push(loggedIn ? { loggedIn, provider: name } : { loggedIn });
+        } else {
+          statuses.push(await this.oauth.status(name));
+        }
       } catch (error) {
         this.log.warn('auth summarize: status threw', {
           provider: name,
@@ -731,8 +748,12 @@ export class AuthSummaryService implements IAuthSummaryService {
       }
       if (auth.oauth !== undefined) {
         const providerKey = auth.oauthProviderKey ?? providerName;
-        const token = await this.oauth.getCachedAccessToken(providerKey, auth.oauth);
-        if (nonEmpty(token) !== undefined) return;
+        if (chatGPTAccountId(auth.oauth.key) !== undefined) {
+          if (await this.modelTokens.hasCachedAccessToken(providerKey, auth.oauth)) return;
+        } else {
+          const token = await this.oauth.getCachedAccessToken(providerKey, auth.oauth);
+          if (nonEmpty(token) !== undefined) return;
+        }
         throw new AuthTokenMissingError(providerKey);
       }
       throw new AuthTokenMissingError(providerName);

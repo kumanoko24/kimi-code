@@ -1,8 +1,12 @@
-import type { LlmRemoteErrorMessage } from '#/llm/response';
-import { NO_FINISH, type FinishInfo } from '#/llm/response';
+import {
+  NO_FINISH,
+  type FinishInfo,
+  type LlmRemoteErrorMessage,
+  type LlmStatusErrorInfo,
+  type TokenUsage,
+} from '#/llm/response';
 import type { StreamedMessagePart } from '#/llm/message';
 import type { DecodeSink, Decoder } from '#/llm/protocol/protocol';
-import type { TokenUsage } from '#/llm/response';
 import { toLlmStreamErrorMessage } from '#/llm/protocol/rules/status';
 
 import {
@@ -163,6 +167,34 @@ function functionCallId(callId: string | undefined): string {
   return callId === undefined || callId.length === 0 ? crypto.randomUUID() : callId;
 }
 
+export function chatGPTPlanError(
+  code: string | null,
+  message: string,
+  details: Omit<LlmStatusErrorInfo, 'retryable'>,
+): LlmRemoteErrorMessage | undefined {
+  switch (code ?? '') {
+    case 'subscription_sharing_usage_limit_exceeded':
+      return {
+        kind: 'quota_exhausted',
+        message: `ChatGPT plan usage limit reached. Review https://chatgpt.com/settings/usage. (${code}) ${message}`,
+        ...details,
+        retryable: false,
+      };
+    case 'subscription_sharing_user_not_eligible':
+    case 'subscription_sharing_route_not_supported':
+    case 'subscription_sharing_unsupported_capability':
+    case 'subscription_sharing_invalid_user':
+    case 'chatpass_v2_scope_not_authorized':
+    case 'chatpass_v2_invalid_authorization_context':
+      return { kind: 'status', message: `ChatGPT plan request failed (${code}). ${message}`, ...details, retryable: false };
+    case 'subscription_sharing_usage_unavailable':
+    case 'subscription_sharing_user_unavailable':
+      return { kind: 'overloaded', message: `ChatGPT plan temporarily unavailable (${code}). ${message}`, ...details, retryable: true };
+    default:
+      return undefined;
+  }
+}
+
 function errorFromOpenAIResponsesEvent(
   code: string | null,
   message: string,
@@ -172,6 +204,8 @@ function errorFromOpenAIResponsesEvent(
     retryAfterMs: null,
     headers: null,
   };
+  const planError = chatGPTPlanError(code, message, statusInfo);
+  if (planError !== undefined) return planError;
   if (isContextOverflowErrorCode(code)) {
     return { kind: 'context_overflow', message, retryable: false, ...statusInfo };
   }

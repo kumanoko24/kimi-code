@@ -42,6 +42,18 @@ export {
 export type { KimiHostIdentity, KimiIdentityOptions } from './identity';
 
 export { KIMI_CODE_FLOW_CONFIG } from './constants';
+export {
+  CHATGPT_API_BASE_URL,
+  CHATGPT_OAUTH_KEY_PREFIX,
+  CHATGPT_PROVIDER_NAME,
+  CHATGPT_SIGN_IN_FLAG,
+  CHATGPT_USAGE_URL,
+  chatGPTAccountId,
+  ChatGPTSessions,
+  type ChatGPTAccount,
+  type ChatGPTLoginOptions,
+  type ChatGPTModel,
+} from './chatgpt';
 
 export {
   KIMI_REGION_MARKER_FILENAME,

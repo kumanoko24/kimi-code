@@ -1,6 +1,13 @@
 import type { OAuthFlowConfig } from './types';
 
 export const DEFAULT_KIMI_CODE_OAUTH_HOST = 'https://auth.kimi.com';
+export const DEFAULT_OAUTH_HTTP_TIMEOUT_MS = 30_000;
+export const DEFAULT_OAUTH_LOGIN_TIMEOUT_MS = 15 * 60 * 1000;
+export const OAUTH_FILE_LOCK_OPTIONS = {
+  retries: { retries: 120, factor: 1, minTimeout: 500, maxTimeout: 1_000 },
+  stale: 5_000,
+  realpath: false,
+};
 
 /** Node-side env override lookup, resolved through `globalThis` so the module
     stays loadable — and typecheckable — in browser bundles that have no

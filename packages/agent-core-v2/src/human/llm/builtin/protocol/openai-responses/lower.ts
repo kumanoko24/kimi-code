@@ -39,6 +39,7 @@ export interface Request {
 
 const OMITTED_AUDIO_PLACEHOLDER = '(audio omitted: unsupported audio format)';
 const OMITTED_VIDEO_PLACEHOLDER = '(video omitted: not supported by this provider)';
+const CHATGPT_TOOL_NAMESPACE = 'kimi';
 
 function mapAudioUrlToInputItem(url: string): NativePart | null {
   if (url.startsWith('data:audio/')) {
@@ -149,7 +150,7 @@ function lowerMessage(message: Message, module: OpenAIResponsesModule): NativeMe
   }
 
   let role: string = message.role;
-  if (usesOpenAIResponsesDeveloperRole(module.model.spec.name) && role === 'system') {
+  if ((module.options?.chatGPTPlan || usesOpenAIResponsesDeveloperRole(module.model.spec.name)) && role === 'system') {
     role = 'developer';
   }
   const result: NativeMessage[] = [];
@@ -215,6 +216,7 @@ function lowerMessage(message: Message, module: OpenAIResponsesModule): NativeMe
         arguments: toolCall.arguments ?? '{}',
         call_id: toolCall.id,
         name: toolCall.name,
+        namespace: module.options?.chatGPTPlan ? CHATGPT_TOOL_NAMESPACE : undefined,
         type: 'function_call',
       });
     }
@@ -270,6 +272,29 @@ function flatten(
   native: NativeModule<NativeMessage, NativeTool, OpenAIResponsesParams>,
   module: OpenAIResponsesModule,
 ): Request {
+  if (module.options?.chatGPTPlan) {
+    const {
+      max_output_tokens: _maxOutputTokens,
+      temperature: _temperature,
+      top_p: _topP,
+      ...params
+    } = native.params;
+    return {
+      params: {
+        ...params,
+        model: module.model.spec.name,
+        instructions: native.system ? native.system : undefined,
+        input: native.messages,
+        tools: native.tools.length === 0 ? undefined : [{
+          type: 'namespace',
+          name: CHATGPT_TOOL_NAMESPACE,
+          description: 'Tools available in Kimi Code CLI',
+          tools: native.tools,
+        }],
+        store: false,
+      } as unknown as Request['params'],
+    };
+  }
   const params = withExtras(
     {
       model: module.model.spec.name,

@@ -1,3 +1,7 @@
+import { ChatGPTSessions, chatGPTAccountId } from '@moonshot-ai/kimi-code-oauth';
+
+import { IBootstrapService } from '#/app/bootstrap/bootstrap';
+
 import { LifecycleScope } from '#/app/scopes';
 
 import { ScopeActivation, registerScopedService } from '#/_base/di/scope';
@@ -11,12 +15,21 @@ import type { OAuthRef } from '#/llm-adapter/provider/provider';
 
 export class ModelOAuthTokenAdapter implements IModelOAuthTokens {
   declare readonly _serviceBrand: undefined;
+  private readonly chatGPT: ChatGPTSessions;
 
-  constructor(@IOAuthService private readonly oauth: IOAuthService) {}
+  constructor(
+    @IOAuthService private readonly oauth: IOAuthService,
+    @IBootstrapService bootstrap: IBootstrapService,
+  ) {
+    this.chatGPT = new ChatGPTSessions(bootstrap.homeDir);
+  }
 
   async hasCachedAccessToken(provider: string, oauthRef: OAuthRef): Promise<boolean> {
     try {
-      const token = await this.oauth.getCachedAccessToken(provider, oauthRef);
+      const account = chatGPTAccountId(oauthRef.key);
+      const token = account === undefined
+        ? await this.oauth.getCachedAccessToken(provider, oauthRef)
+        : await this.chatGPT.getCachedAccessToken(account);
       return nonEmpty(token) !== undefined;
     } catch {
       return false;
@@ -28,6 +41,8 @@ export class ModelOAuthTokenAdapter implements IModelOAuthTokens {
     oauthRef: OAuthRef,
     options?: { readonly force?: boolean },
   ): Promise<string> {
+    const account = chatGPTAccountId(oauthRef.key);
+    if (account !== undefined) return this.chatGPT.getAccessToken(account, options?.force);
     const tokenProvider = this.oauth.resolveTokenProvider(provider, oauthRef);
     if (tokenProvider === undefined) throw loginRequired(provider);
     const token = await tokenProvider.getAccessToken(

@@ -1,3 +1,5 @@
+import { CHATGPT_API_BASE_URL } from '@moonshot-ai/kimi-code-oauth';
+
 import { LifecycleScope } from '#/app/scopes';
 
 import { ScopeActivation, registerScopedService } from '#/_base/di/scope';
@@ -94,6 +96,7 @@ function routeFor(model: Model): AdapterRoute {
         requester: definition?.requester ?? openAIResponsesRequester,
         options: (params) => ({
           extras: samplingExtraParams('openai_responses', params?.sampling),
+          chatGPTPlan: model.providerOptions?.chatGPTPlan,
         }),
         endpoint: definition?.endpoint ?? openAIEndpoint,
         defaultHeaders: definition?.defaultHeaders,
@@ -237,6 +240,7 @@ export class ProtocolAdapterRegistry implements IProtocolAdapterRegistry {
       route.defaultHeaders?.({ model: connection }),
       connection.defaultHeaders,
     );
+    const chatGPTPlan = model.providerOptions?.chatGPTPlan === true;
     const endpoint: LlmEndpoint = {
       ...base.endpoint,
       baseUrl: connection.baseUrl,
@@ -254,7 +258,17 @@ export class ProtocolAdapterRegistry implements IProtocolAdapterRegistry {
       fetch:
         protocolBase.usesEndpointFetch === false
           ? undefined
-          : (input, init) => createLlmHeadersTimeoutFetch()(input, init),
+          : (input, init) => {
+            if (!chatGPTPlan) return createLlmHeadersTimeoutFetch()(input, init);
+            const url = input instanceof Request ? input.url : String(input);
+            if (url !== `${CHATGPT_API_BASE_URL}/responses`) {
+              throw new Error('ChatGPT plan credentials can only be sent to the official Responses endpoint.');
+            }
+            const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+            headers.delete('OpenAI-Organization');
+            headers.delete('OpenAI-Project');
+            return createLlmHeadersTimeoutFetch()(input, { ...init, headers, redirect: 'error' });
+          },
     };
     const contextSizes = [params?.maxContextTokens, connection.maxContextSize].filter(
       (size): size is number => size !== undefined && size > 0,
@@ -269,7 +283,7 @@ export class ProtocolAdapterRegistry implements IProtocolAdapterRegistry {
               : (route.classifyError?.(error) ?? protocolBase.decodeError(error, source)),
         }),
         options,
-        stream: params?.stream ?? true,
+        stream: chatGPTPlan || (params?.stream ?? true),
       },
       endpoint,
       model: {

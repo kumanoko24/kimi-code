@@ -13,6 +13,7 @@ export const ProtocolSchema = z.enum(['anthropic', 'openai', 'openai_responses',
 export type Protocol = z.infer<typeof ProtocolSchema>;
 
 export interface ProtocolProviderOptions {
+  readonly chatGPTPlan?: boolean;
   readonly reasoningKey?: string;
   readonly openrouter?: import('#human/llm/builtin/provider/openrouter/options').OpenRouterOptions;
   readonly defaultMaxTokens?: number;

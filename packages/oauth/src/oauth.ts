@@ -11,6 +11,7 @@
  */
 
 import { extractApiErrorMessage } from './api-error';
+import { DEFAULT_OAUTH_HTTP_TIMEOUT_MS } from './constants';
 import {
   OAuthConnectionError,
   OAuthError,
@@ -53,16 +54,13 @@ function tokenFromResponse(payload: Record<string, unknown>): TokenInfo {
   };
 }
 
-/** HTTP client default timeout for OAuth requests. */
-const DEFAULT_HTTP_TIMEOUT_MS = 30_000;
-
 async function postForm(
   url: string,
   params: Record<string, string>,
   deviceHeaders?: OAuthRequestHeaders | undefined,
   options?: { timeoutMs?: number; signal?: AbortSignal },
 ): Promise<{ status: number; data: Record<string, unknown> }> {
-  const timeoutMs = options?.timeoutMs ?? DEFAULT_HTTP_TIMEOUT_MS;
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_OAUTH_HTTP_TIMEOUT_MS;
   const body = new URLSearchParams(params).toString();
   // Compose a timeout signal with the optional caller signal.
   const signals: AbortSignal[] = [AbortSignal.timeout(timeoutMs)];
