@@ -11,7 +11,11 @@ import { describe, expect, it } from 'vitest';
 import { pluginManifestSchema } from '../src/contract/global/plugins.js';
 import { mcpServerAuthFlowHandleSchema } from '../src/contract/global/mcpManagement.js';
 import { createSessionOptionsSchema } from '../src/contract/session/lifecycle.js';
-import { promptPayloadSchema } from '../src/contract/agent/schemas.js';
+import {
+  promptPayloadSchema,
+  tokenUsageSchema,
+  usageStatusSchema,
+} from '../src/contract/agent/schemas.js';
 
 type McpTimeoutField = 'startupTimeoutMs' | 'toolTimeoutMs';
 
@@ -112,5 +116,39 @@ describe('prompt contract validation', () => {
 
   it('accepts a non-empty caller-chosen promptId', () => {
     expect(promptPayloadSchema.safeParse({ input: [], promptId: 'submission-1' }).success).toBe(true);
+  });
+});
+
+describe('usage contract validation', () => {
+  it('preserves cost across a validated status call', () => {
+    const total = {
+      inputOther: 220,
+      output: 50,
+      inputCacheCreation: 0,
+      cost: 0.0053,
+    };
+    const parsed = usageStatusSchema.parse({
+      byModel: { meter: total },
+      total,
+    });
+    expect(parsed.total).toMatchObject({ cost: 0.0053 });
+    expect(parsed.byModel?.['meter']).toMatchObject({ cost: 0.0053 });
+  });
+
+  it('keeps cost absent when the provider does not report one', () => {
+    const parsed = usageStatusSchema.parse({
+      total: { inputOther: 100, output: 20, inputCacheCreation: 0 },
+    });
+    expect(parsed.total).not.toHaveProperty('cost');
+  });
+
+  it('rejects a negative cost', () => {
+    const parsed = tokenUsageSchema.safeParse({
+      inputOther: 1,
+      output: 1,
+      inputCacheCreation: 0,
+      cost: -1,
+    });
+    expect(parsed.success).toBe(false);
   });
 });

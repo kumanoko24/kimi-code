@@ -135,6 +135,7 @@ export const tokenUsageSchema = z.object({
   output: z.number(),
   inputCacheRead: z.number().optional(),
   inputCacheCreation: z.number(),
+  cost: z.number().nonnegative().optional(),
 });
 
 export const usageStatusSchema = z.object({
