@@ -218,7 +218,7 @@ api_key = "sk-xxxxx"
 
 ### Sign in with ChatGPT
 
-要使用符合条件的 ChatGPT 订阅，请设置 `KIMI_CODE_EXPERIMENTAL_CHATGPT_SIGN_IN=1` 后启动 Kimi Code CLI。运行 `/login`，选择 **Sign in with ChatGPT**，在同一台设备的浏览器中授权使用订阅。使用 `/model` 从账号的模型目录中选择模型。切换账号或续期时，在 `/login` 中选择已保存的账号。退出当前会话时，在 `/logout` 中选择 ChatGPT。
+运行 `/login`，选择 **Sign in with ChatGPT**，在同一台设备的浏览器中授权使用符合条件的 ChatGPT 订阅。使用 `/model` 从账号的模型目录中选择模型。切换账号或续期时，在 `/login` 中选择已保存的账号。退出当前会话时，在 `/logout` 中选择 ChatGPT。如需禁用登录，请设置 `KIMI_CODE_EXPERIMENTAL_CHATGPT_SIGN_IN=0` 后启动 Kimi Code CLI。
 
 终端用法见 [`kimi login`](../reference/kimi-command.md#kimi-login)。订阅限额和应用授权可在 [ChatGPT 设置 → 用量](https://chatgpt.com/settings/usage) 中查看。
 

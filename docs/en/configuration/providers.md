@@ -218,7 +218,7 @@ api_key = "sk-xxxxx"
 
 ### Sign in with ChatGPT
 
-To use an eligible ChatGPT plan, start Kimi Code CLI with `KIMI_CODE_EXPERIMENTAL_CHATGPT_SIGN_IN=1`. Run `/login`, select **Sign in with ChatGPT**, and approve plan usage in the browser on the same machine. Use `/model` to select a model from your account's catalog. To switch accounts or renew access, select a saved account in `/login`. Select ChatGPT in `/logout` to end the active session.
+Run `/login`, select **Sign in with ChatGPT**, and approve use of an eligible ChatGPT plan in the browser on the same machine. Use `/model` to select a model from your account's catalog. To switch accounts or renew access, select a saved account in `/login`. Select ChatGPT in `/logout` to end the active session. To disable sign-in, start Kimi Code CLI with `KIMI_CODE_EXPERIMENTAL_CHATGPT_SIGN_IN=0`.
 
 For terminal commands, see [`kimi login`](../reference/kimi-command.md#kimi-login). Review plan limits and app access in [ChatGPT Settings → Usage](https://chatgpt.com/settings/usage).
 

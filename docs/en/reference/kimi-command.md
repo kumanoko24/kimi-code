@@ -149,10 +149,9 @@ kimi login
 
 Use `--region mainland-cn` or `--region global` to select the Kimi Code login region. Press `Ctrl-C` to cancel. The exit code is `1` on cancellation or failure and `0` on success.
 
-For [Sign in with ChatGPT](../configuration/providers.md#sign-in-with-chatgpt), enable the experimental flag and use the browser on the same machine. List saved accounts to find an ID for signing in again with that registration.
+For [Sign in with ChatGPT](../configuration/providers.md#sign-in-with-chatgpt), use the browser on the same machine. List saved accounts to find an ID for signing in again with that registration.
 
 ```sh
-export KIMI_CODE_EXPERIMENTAL_CHATGPT_SIGN_IN=1
 kimi login --provider chatgpt
 kimi login --provider chatgpt --list-accounts
 kimi login --provider chatgpt --account 1

@@ -7,6 +7,6 @@ registerFlagDefinition({
   title: 'Sign in with ChatGPT',
   description: 'Use an eligible ChatGPT plan for model requests.',
   env: 'KIMI_CODE_EXPERIMENTAL_CHATGPT_SIGN_IN',
-  default: false,
+  default: true,
   surface: 'core',
 });
