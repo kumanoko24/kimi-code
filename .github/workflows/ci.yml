@@ -25,6 +25,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: node --test scripts/release-trigger.test.mjs scripts/canary-release.test.mjs
+      - run: node scripts/check-no-evidence.mjs
 
   build:
     runs-on: ubuntu-latest
