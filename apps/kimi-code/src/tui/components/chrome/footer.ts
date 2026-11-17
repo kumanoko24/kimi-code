@@ -34,6 +34,7 @@ import {
 } from '#/utils/git/git-status';
 import {
   formatTokenCount,
+  formatUsdCost,
   usagePercent,
   usagePercentFromRatio,
 } from '#/utils/usage/usage-format';
@@ -417,11 +418,13 @@ export class FooterComponent implements Component {
     }
 
     // ── Line 2: hint (bottom-left) + context (right) ──
-    const contextText = formatContextStatus(
-      state.contextUsage,
-      state.contextTokens,
-      state.maxContextTokens,
-    );
+    const costText =
+      state.cumulativeCostUsd === undefined
+        ? ''
+        : ` · ${formatUsdCost(state.cumulativeCostUsd)}`;
+    const contextText =
+      formatContextStatus(state.contextUsage, state.contextTokens, state.maxContextTokens) +
+      costText;
     const contextWidth = visibleWidth(contextText);
     let line2: string;
     const hint = this.transientHint ?? this.warningHint;
@@ -612,6 +615,7 @@ export class FooterComponent implements Component {
       contextUsage: state.contextUsage,
       contextTokens: state.contextTokens,
       maxContextTokens: state.maxContextTokens,
+      costUsd: state.cumulativeCostUsd ?? null,
       sessionId: state.sessionId,
       version: state.version,
     };

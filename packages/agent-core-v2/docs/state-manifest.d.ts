@@ -977,6 +977,7 @@ export interface AgentStateSnapshot {
       output: number;
       inputCacheRead?: number;
       inputCacheCreation: number;
+      cost?: number;
       raw?: Record<string, unknown>;
     };
     readonly systemPromptHash: string;

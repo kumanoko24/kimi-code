@@ -37,6 +37,14 @@ describe('TokenUsage aggregation', () => {
     });
   });
 
+  it('addUsage sums cost from reported records only', () => {
+    const a = { ...emptyUsage(), cost: 0.4 };
+    const b = { ...emptyUsage(), cost: 1.2 };
+    expect(addUsage(a, b).cost).toBeCloseTo(1.6);
+    expect(addUsage(a, emptyUsage()).cost).toBe(0.4);
+    expect(addUsage(emptyUsage(), emptyUsage()).cost).toBeUndefined();
+  });
+
   it('inputTotal sums known input counters and preserves unknown totals', () => {
     const usage = { inputOther: 5, output: 7, inputCacheRead: 11, inputCacheCreation: 13 };
     expect(inputTotal(usage)).toBe(29);

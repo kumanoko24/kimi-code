@@ -3536,6 +3536,7 @@ export class KimiTUI {
       contextUsage: status.contextUsage,
       cumulativeTokens:
         status.usage?.total === undefined ? 0 : sumTokenUsage(status.usage.total),
+      cumulativeCostUsd: status.usage?.total?.cost,
       sessionTitle: session.summary?.title ?? null,
       goal: goalResult.goal,
     });

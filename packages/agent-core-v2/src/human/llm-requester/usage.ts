@@ -3,6 +3,7 @@ export interface TokenUsage {
   output: number;
   inputCacheRead?: number;
   inputCacheCreation: number;
+  cost?: number;
   raw?: Record<string, unknown>;
 }
 
@@ -29,6 +30,10 @@ export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
         ? undefined
         : a.inputCacheRead + b.inputCacheRead,
     inputCacheCreation: a.inputCacheCreation + b.inputCacheCreation,
+    cost:
+      a.cost === undefined && b.cost === undefined
+        ? undefined
+        : (a.cost ?? 0) + (b.cost ?? 0),
   };
 }
 
@@ -41,5 +46,6 @@ export function mergeUsagePatch(
     output: patch.output ?? base?.output ?? 0,
     inputCacheRead: patch.inputCacheRead ?? base?.inputCacheRead,
     inputCacheCreation: patch.inputCacheCreation ?? base?.inputCacheCreation ?? 0,
+    cost: patch.cost ?? base?.cost,
   };
 }

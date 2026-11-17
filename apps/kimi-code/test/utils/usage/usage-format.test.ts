@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import {
   formatTokenCount,
+  formatUsdCost,
   quotaUsageRows,
   renderProgressBar,
   ratioSeverity,
@@ -44,6 +45,26 @@ describe('formatTokenCount', () => {
     expect(formatTokenCount(-1)).toBe('0');
     expect(formatTokenCount(Number.NaN)).toBe('0');
     expect(formatTokenCount(Number.POSITIVE_INFINITY)).toBe('0');
+  });
+});
+
+describe('formatUsdCost', () => {
+  it('shows 4 decimals under a dollar so cheap calls stay readable', () => {
+    expect(formatUsdCost(0)).toBe('$0.0000');
+    expect(formatUsdCost(0.0042)).toBe('$0.0042');
+    expect(formatUsdCost(0.4321)).toBe('$0.4321');
+    expect(formatUsdCost(0.99996)).toBe('$1.0000');
+  });
+
+  it('shows 2 decimals from a dollar up', () => {
+    expect(formatUsdCost(1)).toBe('$1.00');
+    expect(formatUsdCost(12.34567)).toBe('$12.35');
+  });
+
+  it('clamps negatives and NaN to $0.0000', () => {
+    expect(formatUsdCost(-1)).toBe('$0.0000');
+    expect(formatUsdCost(Number.NaN)).toBe('$0.0000');
+    expect(formatUsdCost(Number.POSITIVE_INFINITY)).toBe('$0.0000');
   });
 });
 

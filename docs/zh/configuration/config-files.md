@@ -668,7 +668,7 @@ defaultCwd = "/workspace"
 <details>
 <summary>command 的 stdin 输入</summary>
 
-model、cwd、git 分支、permission 模式、plan 模式、上下文用量、session id、版本。
+Model、cwd、git 分支、permission 模式、plan 模式、上下文用量、上下文 token 数、上下文 token 上限、`costUsd`（Provider 上报费用时为当前 Session 的 USD 总额，否则为 `null`）、session id、版本。
 
 </details>
 

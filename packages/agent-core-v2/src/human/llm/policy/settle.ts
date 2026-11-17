@@ -42,6 +42,7 @@ function mergeUsagePatch(base: TokenUsage | undefined, patch: Partial<TokenUsage
     output: patch.output ?? base?.output ?? 0,
     inputCacheRead: patch.inputCacheRead ?? base?.inputCacheRead,
     inputCacheCreation: patch.inputCacheCreation ?? base?.inputCacheCreation ?? 0,
+    cost: patch.cost ?? base?.cost,
   };
 }
 

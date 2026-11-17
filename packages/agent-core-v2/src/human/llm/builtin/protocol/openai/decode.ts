@@ -25,6 +25,7 @@ export type RawUsage = {
   completion_tokens?: number;
   cached_tokens?: number;
   prompt_tokens_details?: { cached_tokens?: number } | null;
+  cost?: number;
 };
 
 export type RawStreamToolCallDelta = {
@@ -186,6 +187,7 @@ export function parseUsage(usage: RawUsage | null | undefined): Partial<TokenUsa
     output: usage.completion_tokens ?? 0,
     inputCacheRead: cached,
     inputCacheCreation: 0,
+    cost: typeof usage.cost === 'number' && Number.isFinite(usage.cost) ? usage.cost : undefined,
     raw: usage as Record<string, unknown>,
   };
 }

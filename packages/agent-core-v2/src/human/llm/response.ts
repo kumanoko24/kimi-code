@@ -21,6 +21,7 @@ export interface TokenUsage {
   output: number;
   inputCacheRead?: number;
   inputCacheCreation: number;
+  cost?: number;
   raw?: Record<string, unknown>;
 }
 

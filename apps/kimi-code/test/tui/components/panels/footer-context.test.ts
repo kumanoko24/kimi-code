@@ -78,6 +78,22 @@ describe('FooterComponent — context NaN resilience', () => {
     expect(out).toMatch(/context: 1%/);
   });
 
+  it('cost readout shows when the cumulative USD spend is known', () => {
+    const fc = new FooterComponent(
+      baseState({ contextUsage: 0.4, contextTokens: 40, maxContextTokens: 100, cumulativeCostUsd: 0.4321 }),
+    );
+    const out = strip(fc.render(200).join(''));
+    expect(out).toMatch(/context: 40% \(40\/100\) · \$0\.4321/);
+  });
+
+  it('cost readout stays hidden when no provider reported cost', () => {
+    const fc = new FooterComponent(
+      baseState({ contextUsage: 0.4, contextTokens: 40, maxContextTokens: 100 }),
+    );
+    const out = strip(fc.render(200).join(''));
+    expect(out).not.toMatch(/\$/);
+  });
+
   it('valid tokens/maxTokens → percent from tokens, counts in 1024 units', () => {
     const fc = new FooterComponent(
       baseState({

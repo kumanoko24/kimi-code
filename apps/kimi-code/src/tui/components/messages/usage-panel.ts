@@ -11,6 +11,7 @@ import type { SessionUsage, TokenUsage } from '@moonshot-ai/kimi-code-sdk';
 
 import {
   formatTokenCount,
+  formatUsdCost,
   ratioSeverity,
   renderProgressBar,
   safeUsageRatio,
@@ -92,22 +93,28 @@ function buildSessionUsageSection(
   const lines: string[] = [];
   let totalInput = 0;
   let totalOutput = 0;
+  let totalCostUsd: number | undefined;
   for (const [model, row] of entries) {
     const input = usageInputTotal(row);
     const output = usageNumber(row.output);
     totalInput += input;
     totalOutput += output;
+    const cost = usageNumber(row.cost);
+    if (row.cost !== undefined) totalCostUsd = (totalCostUsd ?? 0) + cost;
+    const costText = row.cost === undefined ? '' : `  cost ${value(formatUsdCost(cost))}`;
     lines.push(
       `  ${muted(model)}  input ${value(formatTokenCount(input))}  output ${value(
         formatTokenCount(output),
-      )}  total ${value(formatTokenCount(input + output))}`,
+      )}  total ${value(formatTokenCount(input + output))}${costText}`,
     );
   }
   if (entries.length > 1) {
+    const totalCostText =
+      totalCostUsd === undefined ? '' : `  cost ${value(formatUsdCost(totalCostUsd))}`;
     lines.push(
       `  ${muted('total')}  input ${value(formatTokenCount(totalInput))}  output ${value(
         formatTokenCount(totalOutput),
-      )}  total ${value(formatTokenCount(totalInput + totalOutput))}`,
+      )}  total ${value(formatTokenCount(totalInput + totalOutput))}${totalCostText}`,
     );
   }
   return lines;

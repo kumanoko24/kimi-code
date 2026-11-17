@@ -519,6 +519,7 @@ export interface TokenUsage {
   readonly output: number;
   readonly inputCacheRead?: number;
   readonly inputCacheCreation: number;
+  readonly cost?: number;
 }
 
 export interface SessionUsage {

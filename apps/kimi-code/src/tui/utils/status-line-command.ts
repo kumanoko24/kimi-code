@@ -23,6 +23,7 @@ export interface StatusLinePayload {
   contextUsage: number;
   contextTokens: number;
   maxContextTokens: number;
+  costUsd: number | null;
   sessionId: string;
   version: string;
 }

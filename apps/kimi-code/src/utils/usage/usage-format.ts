@@ -29,6 +29,15 @@ function trimDecimal(v: number): string {
 }
 
 /**
+ * Render a USD amount: sub-dollar sessions show 4 decimals (`$0.0420`) so a
+ * few cheap calls stay readable; from $1 up, plain cents (`$1.23`).
+ */
+export function formatUsdCost(cost: number): string {
+  if (!Number.isFinite(cost) || cost < 0) return '$0.0000';
+  return `$${cost.toFixed(cost >= 1 ? 2 : 4)}`;
+}
+
+/**
  * Usage as a whole-number percentage of `max`, ceiled so any non-zero
  * usage shows at least 1%, clamped to [0, 100]. A non-positive or
  * non-finite `max` reports 0.

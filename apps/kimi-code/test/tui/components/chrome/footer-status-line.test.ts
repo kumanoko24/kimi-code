@@ -53,6 +53,7 @@ const payload: StatusLinePayload = {
   contextUsage: 12,
   contextTokens: 1024,
   maxContextTokens: 8192,
+  costUsd: null,
   sessionId: 'ses-1',
   version: '1.2.3',
 };

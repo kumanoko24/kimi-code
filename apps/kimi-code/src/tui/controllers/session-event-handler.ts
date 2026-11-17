@@ -822,6 +822,7 @@ export class SessionEventHandler {
     if (event.thinkingEffort !== undefined) patch.thinkingEffort = event.thinkingEffort;
     if (event.usage?.total !== undefined) {
       patch.cumulativeTokens = sumTokenUsage(event.usage.total);
+      patch.cumulativeCostUsd = event.usage.total.cost;
     }
     if (Object.keys(patch).length > 0) this.host.setAppState(patch);
     if (event.swarmMode === false) {
