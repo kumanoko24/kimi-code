@@ -32,6 +32,7 @@ export {
 
 export interface OpenAIResponsesOptions {
   readonly chatGPTPlan?: boolean;
+  readonly chatGPTServiceTier?: string;
   readonly extras?: OpenAIResponsesExtraParams;
   readonly toolMessageConversion?: ToolMessageConversion;
 }

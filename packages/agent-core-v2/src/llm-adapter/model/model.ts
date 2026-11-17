@@ -1,3 +1,4 @@
+import type { ChatGPTServiceTier } from '@moonshot-ai/kimi-code-oauth';
 import { z } from 'zod';
 
 import { createDecorator, type ServiceIdentifier } from '#/_base/di/instantiation';
@@ -55,6 +56,7 @@ export interface ModelRecord {
   defaultEffort?: string;
   offEffort?: string;
   effortMap?: Record<string, string>;
+  serviceTier?: ChatGPTServiceTier;
   upgrade?: ModelUpgrade;
 
   overrides?: ModelOverride;

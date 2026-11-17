@@ -4,6 +4,7 @@ import {
   readConfigFileForUpdate,
   writeConfigFile,
   type KimiConfig,
+  type ModelAlias,
   type OAuthRef,
 } from '#/config/index';
 import {
@@ -24,12 +25,14 @@ import {
   type AuthStatus,
   type BearerTokenProvider,
   type ChatGPTLoginOptions,
+  type ChatGPTModel,
   type KimiHostIdentity,
   type KimiOAuthLoginOptions,
   type KimiRegion,
   type ManagedKimiConfigShape,
   type OAuthRefreshOutcome,
 } from '@moonshot-ai/kimi-code-oauth';
+import type { RefreshProviderModelsResponse } from '@moonshot-ai/klient';
 
 import { mapOAuthTokenError } from '#/oauth-error';
 
@@ -71,6 +74,7 @@ type SDKManagedConfig = KimiConfig & ManagedKimiConfigShape;
 export class KimiAuthFacade {
   private readonly toolkit: KimiOAuthToolkit<SDKManagedConfig>;
   private readonly chatGPT: ChatGPTSessions;
+  private refreshedChatGPTAccount: string | undefined;
 
   constructor(private readonly options: KimiAuthFacadeOptions) {
     this.chatGPT = new ChatGPTSessions(options.homeDir);
@@ -122,38 +126,48 @@ export class KimiAuthFacade {
     await this.chatGPT.login(options, async (accountId, models) => {
       const config = readConfigFileForUpdate(path);
       checkProvider(config);
-      const aliases = (config.models ??= {});
-      const available = new Set(models.map(({ slug }) => slug));
-      for (const [alias, model] of Object.entries(aliases)) {
-        if (model.provider === CHATGPT_PROVIDER_NAME && !available.has(model.model)) delete aliases[alias];
-      }
       config.providers[CHATGPT_PROVIDER_NAME] = {
         type: 'openai_responses',
         baseUrl: CHATGPT_API_BASE_URL,
         oauth: { storage: 'file', key: CHATGPT_OAUTH_KEY_PREFIX + accountId },
       };
-      let firstModel: string | undefined;
-      for (const model of models) {
-        const alias = `${CHATGPT_PROVIDER_NAME}/${model.slug}`;
-        const previous = aliases[alias];
-        if (previous !== undefined && (previous.provider !== CHATGPT_PROVIDER_NAME || previous.model !== model.slug)) {
-          throw new Error(`A configured model already uses the alias "${alias}".`);
-        }
-        aliases[alias] = previous ?? {
-          provider: CHATGPT_PROVIDER_NAME,
-          model: model.slug,
-          displayName: model.displayName,
-          maxContextSize: model.contextWindow ?? CUSTOM_REGISTRY_DEFAULT_MAX_CONTEXT,
-        };
-        firstModel ??= alias;
-      }
-      if (config.defaultModel === undefined || aliases[config.defaultModel] === undefined) {
-        config.defaultModel = firstModel;
-        config.thinking = undefined;
-      }
+      applyChatGPTModels(config, models);
       await writeConfigFile(path, config);
     });
     this.options.onConfigUpdated?.(readConfigFile(path));
+  }
+
+  async refreshChatGPTModelCatalog(force = false): Promise<RefreshProviderModelsResponse | undefined> {
+    const accountId = this.activeChatGPTAccount();
+    if (accountId === undefined) return undefined;
+    const configured = loadRuntimeConfigSafe(this.options.configPath).config.models ?? {};
+    const aliases = Object.values(configured).filter((model) => model.provider === CHATGPT_PROVIDER_NAME);
+    if (!force && (this.refreshedChatGPTAccount === accountId || aliases.some((model) => model.supportEfforts !== undefined || model.serviceTier !== undefined))) return undefined;
+    const models = await this.chatGPT.listModels(accountId);
+    const path = this.options.configPath;
+    const config = readConfigFileForUpdate(path);
+    if (chatGPTAccountId(config.providers[CHATGPT_PROVIDER_NAME]?.oauth?.key) !== accountId) return undefined;
+    const previous = { ...config.models };
+    const previousDefault = config.defaultModel;
+    applyChatGPTModels(config, models);
+    const next = config.models ?? {};
+    if (previousDefault === config.defaultModel && JSON.stringify(previous) === JSON.stringify(next)) {
+      this.refreshedChatGPTAccount = accountId;
+      return { changed: [], unchanged: [CHATGPT_PROVIDER_NAME], failed: [] };
+    }
+    await writeConfigFile(path, config);
+    this.options.onConfigUpdated?.(config);
+    this.refreshedChatGPTAccount = accountId;
+    return {
+      changed: [{
+        provider_id: CHATGPT_PROVIDER_NAME,
+        provider_name: 'ChatGPT',
+        added: Object.keys(next).filter((alias) => !Object.hasOwn(previous, alias)).length,
+        removed: Object.keys(previous).filter((alias) => !Object.hasOwn(next, alias)).length,
+      }],
+      unchanged: [],
+      failed: [],
+    };
   }
 
   async login(
@@ -303,6 +317,72 @@ export class KimiAuthFacade {
       configuredOAuthRef: oauthRef ?? auth.oauthRef,
     }).oauthRef;
   }
+}
+
+function applyChatGPTModels(config: KimiConfig, models: readonly ChatGPTModel[]): void {
+  if (models.length === 0) throw new Error('This ChatGPT account has no models available for plan usage.');
+  const aliases = (config.models ??= {});
+  const previousDefault = aliases[config.defaultModel ?? ''];
+  const bySlug = new Map(models.map((model) => [model.slug, model]));
+  for (const [alias, model] of Object.entries(aliases)) {
+    if (model.provider !== CHATGPT_PROVIDER_NAME) continue;
+    const metadata = bySlug.get(model.model);
+    if (metadata === undefined || (model.serviceTier !== undefined && !metadata.serviceTiers.includes(model.serviceTier))) {
+      delete aliases[alias];
+    } else {
+      aliases[alias] = withChatGPTModelEfforts(model, metadata);
+    }
+  }
+  for (const model of models) {
+    const alias = `${CHATGPT_PROVIDER_NAME}/${model.slug}`;
+    const previous = aliases[alias];
+    if (previous !== undefined && (previous.provider !== CHATGPT_PROVIDER_NAME || previous.model !== model.slug || previous.serviceTier !== undefined)) {
+      throw new Error(`A configured model already uses the alias "${alias}".`);
+    }
+    const normal = previous ?? withChatGPTModelEfforts({
+      provider: CHATGPT_PROVIDER_NAME,
+      model: model.slug,
+      displayName: model.displayName,
+      maxContextSize: model.contextWindow ?? CUSTOM_REGISTRY_DEFAULT_MAX_CONTEXT,
+    }, model);
+    aliases[alias] = normal;
+    for (const tier of model.serviceTiers) {
+      const variantAlias = `${alias}/${tier}`;
+      const saved = aliases[variantAlias];
+      if (saved !== undefined && (saved.provider !== normal.provider || saved.model !== normal.model || saved.serviceTier !== tier)) {
+        throw new Error(`A configured model already uses the alias "${variantAlias}".`);
+      }
+      const label = tier === 'priority' ? 'Fast' : 'Ultrafast';
+      aliases[variantAlias] = {
+        ...normal,
+        displayName: `${normal.displayName ?? normal.model} · ${label}`,
+        serviceTier: tier,
+        overrides: saved?.overrides ?? normal.overrides,
+      };
+    }
+  }
+  if (config.defaultModel === undefined || aliases[config.defaultModel] === undefined) {
+    const sameModel = previousDefault?.provider === CHATGPT_PROVIDER_NAME && bySlug.has(previousDefault.model);
+    config.defaultModel = `${CHATGPT_PROVIDER_NAME}/${sameModel ? previousDefault.model : models[0]!.slug}`;
+    if (!sameModel) config.thinking = undefined;
+  }
+}
+
+function withChatGPTModelEfforts(model: ModelAlias, metadata: ChatGPTModel): ModelAlias {
+  if (metadata.reasoningEfforts === undefined || metadata.reasoningEfforts.length === 0) return model;
+  const efforts = metadata.reasoningEfforts.filter((effort) => effort !== 'none');
+  const offEffort = metadata.reasoningEfforts.includes('none') ? 'none' : undefined;
+  const capabilities = (model.capabilities ?? []).filter((capability) => capability !== 'always_thinking');
+  if (efforts.length > 0) capabilities.push(offEffort === undefined ? 'always_thinking' : 'thinking');
+  return {
+    ...model,
+    supportEfforts: efforts,
+    offEffort,
+    defaultEffort: metadata.defaultEffort !== undefined && efforts.includes(metadata.defaultEffort)
+      ? metadata.defaultEffort
+      : undefined,
+    capabilities: [...new Set(capabilities)],
+  };
 }
 
 function removeChatGPTModels(config: KimiConfig): void {

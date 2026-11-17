@@ -47,12 +47,14 @@ export {
   CHATGPT_OAUTH_KEY_PREFIX,
   CHATGPT_PROVIDER_NAME,
   CHATGPT_SIGN_IN_FLAG,
+  CHATGPT_SERVICE_TIERS,
   CHATGPT_USAGE_URL,
   chatGPTAccountId,
   ChatGPTSessions,
   type ChatGPTAccount,
   type ChatGPTLoginOptions,
   type ChatGPTModel,
+  type ChatGPTServiceTier,
 } from './chatgpt';
 
 export {

@@ -20,6 +20,8 @@ export const CHATGPT_SIGN_IN_FLAG = 'chatgpt_sign_in';
 export const CHATGPT_API_BASE_URL = 'https://api.openai.com/v1';
 export const CHATGPT_OAUTH_KEY_PREFIX = 'oauth/chatgpt/';
 export const CHATGPT_USAGE_URL = 'https://chatgpt.com/settings/usage';
+export const CHATGPT_SERVICE_TIERS = ['priority', 'ultrafast'] as const;
+export type ChatGPTServiceTier = (typeof CHATGPT_SERVICE_TIERS)[number];
 
 const ISSUER = 'https://auth.openai.com';
 const AUTHORIZE_URL = `${ISSUER}/api/accounts/authorize`;
@@ -75,6 +77,9 @@ const modelsSchema = z.object({
     display_name: text,
     visibility: text,
     context_window: z.number().int().positive().optional(),
+    supported_reasoning_levels: z.array(z.object({ effort: text })).optional(),
+    default_reasoning_level: text.nullish(),
+    service_tiers: z.array(z.object({ id: text })).nullish(),
   })),
 });
 
@@ -98,6 +103,9 @@ export interface ChatGPTModel {
   readonly slug: string;
   readonly displayName: string;
   readonly contextWindow?: number | undefined;
+  readonly reasoningEfforts?: readonly string[] | undefined;
+  readonly defaultEffort?: string | undefined;
+  readonly serviceTiers: readonly ChatGPTServiceTier[];
 }
 
 export function chatGPTAccountId(oauthKey: string | undefined): string | undefined {
@@ -127,6 +135,10 @@ export class ChatGPTSessions {
   async getCachedAccessToken(accountId: string): Promise<string | undefined> {
     const credentials = await this.read();
     return credentials?.accounts.find((item) => item.id === accountId)?.session?.accessToken;
+  }
+
+  async listModels(accountId: string): Promise<readonly ChatGPTModel[]> {
+    return fetchModels(await this.getAccessToken(accountId));
   }
 
   async login(
@@ -333,7 +345,7 @@ function planSession(token: z.infer<typeof tokenResponseSchema>, previous?: Sess
   };
 }
 
-async function fetchModels(accessToken: string, signal: AbortSignal): Promise<ChatGPTModel[]> {
+async function fetchModels(accessToken: string, signal?: AbortSignal): Promise<ChatGPTModel[]> {
   const response = await fetch(`${CHATGPT_API_BASE_URL}/models`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     signal: requestSignal(DEFAULT_OAUTH_HTTP_TIMEOUT_MS, signal),
@@ -352,6 +364,11 @@ async function fetchModels(accessToken: string, signal: AbortSignal): Promise<Ch
       slug: model.slug,
       displayName: model.display_name,
       contextWindow: model.context_window,
+      reasoningEfforts: model.supported_reasoning_levels === undefined
+        ? undefined
+        : [...new Set(model.supported_reasoning_levels.map(({ effort }) => effort))],
+      defaultEffort: model.default_reasoning_level ?? undefined,
+      serviceTiers: CHATGPT_SERVICE_TIERS.filter((tier) => model.service_tiers?.some(({ id }) => id === tier)),
     }));
 }
 

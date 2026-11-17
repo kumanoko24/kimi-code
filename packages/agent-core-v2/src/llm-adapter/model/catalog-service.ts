@@ -333,7 +333,9 @@ export class ModelCatalog extends Disposable implements IModelCatalog {
       providerType,
       providerName,
       credentialProvider,
-      providerOptions: chatGPTPlan ? { ...providerOptions, chatGPTPlan } : providerOptions,
+      providerOptions: chatGPTPlan
+        ? { ...providerOptions, chatGPTPlan, chatGPTServiceTier: model.serviceTier }
+        : providerOptions,
     };
   }
 

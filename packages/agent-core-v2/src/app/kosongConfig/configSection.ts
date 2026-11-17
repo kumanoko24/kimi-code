@@ -1,3 +1,4 @@
+import { CHATGPT_SERVICE_TIERS } from '@moonshot-ai/kimi-code-oauth';
 import { z } from 'zod';
 
 import { OpenRouterOptionsSchema } from '#human/llm/builtin/provider/openrouter/options';
@@ -190,6 +191,7 @@ const ModelBaseSchema = z.object({
   defaultEffort: z.string().optional(),
   offEffort: z.string().optional(),
   effortMap: z.record(z.string(), z.string()).optional(),
+  serviceTier: z.enum(CHATGPT_SERVICE_TIERS).optional(),
   upgrade: modelUpgradeSchema.optional(),
 });
 
@@ -205,6 +207,7 @@ export const ModelOverrideSchema = ModelBaseSchema.omit({
   model: true,
   betaApi: true,
   upgrade: true,
+  serviceTier: true,
 }).partial();
 
 export const ModelRecordSchema = ModelBaseSchema.extend({

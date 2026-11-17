@@ -224,6 +224,8 @@ For terminal commands, see [`kimi login`](../reference/kimi-command.md#kimi-logi
 
 Switching accounts updates the ChatGPT model list. Future requests for ChatGPT models, including requests in existing Kimi sessions, use the selected account.
 
+In `/model`, use the left and right arrow keys to choose a reasoning effort. After selecting the model, request **Normal**, **Fast**, or **Ultrafast** from the tiers available to the account and model. OpenAI may process the request at a different tier. Use `Alt-S` on the model to apply the selection to the current session. Run `/provider refresh chatgpt` to reload available options.
+
 ## `google-genai`
 
 For connecting directly to the Google Gemini API. Thinking, vision, and multimodal capabilities are auto-detected by model name.

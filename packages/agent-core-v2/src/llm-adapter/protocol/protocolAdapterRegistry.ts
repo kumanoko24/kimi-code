@@ -97,6 +97,7 @@ function routeFor(model: Model): AdapterRoute {
         options: (params) => ({
           extras: samplingExtraParams('openai_responses', params?.sampling),
           chatGPTPlan: model.providerOptions?.chatGPTPlan,
+          chatGPTServiceTier: model.providerOptions?.chatGPTServiceTier,
         }),
         endpoint: definition?.endpoint ?? openAIEndpoint,
         defaultHeaders: definition?.defaultHeaders,

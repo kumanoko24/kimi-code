@@ -285,6 +285,7 @@ function flatten(
         model: module.model.spec.name,
         instructions: native.system ? native.system : undefined,
         input: native.messages,
+        service_tier: module.options.chatGPTServiceTier,
         tools: native.tools.length === 0 ? undefined : [{
           type: 'namespace',
           name: CHATGPT_TOOL_NAMESPACE,

@@ -8,7 +8,9 @@ import {
   type ThinkingEffort,
 } from '@moonshot-ai/kimi-code-sdk';
 import { TuiAltScreen } from '@moonshot-ai/pi-tui';
+import { CHATGPT_PROVIDER_NAME, CHATGPT_SERVICE_TIERS, chatGPTAccountId } from '@moonshot-ai/kimi-code-oauth';
 
+import { ChoicePickerComponent, type ChoiceOption } from '../components/dialogs/choice-picker';
 import { EditorSelectorComponent } from '../components/dialogs/editor-selector';
 import { EffortSelectorComponent } from '../components/dialogs/effort-selector';
 import {
@@ -371,6 +373,14 @@ function showEditorPicker(host: SlashCommandHost): void {
 
 async function refreshModelsForPicker(host: SlashCommandHost): Promise<void> {
   try {
+    const chatGPT = await host.harness.auth.refreshChatGPTModelCatalog();
+    if (chatGPT !== undefined && chatGPT.changed.length > 0) {
+      await host.authFlow.refreshAvailableModels();
+    }
+  } catch (error) {
+    host.showStatus(`Skipped refreshing ChatGPT models: ${formatErrorMessage(error)}`, 'warning');
+  }
+  try {
     const result = await withTimeout(
       host.authFlow.refreshOAuthProviderModels(),
       MODEL_PICKER_REFRESH_TIMEOUT_MS,
@@ -455,29 +465,72 @@ export async function showModelPicker(host: SlashCommandHost, selectedValue: str
     } catch {}
   }
   const models = pickerModelsForHost(host);
-  const entries = Object.entries(models);
-  if (entries.length === 0) {
+  if (Object.keys(models).length === 0) {
     host.showNotice(
       'No models configured',
       'Run /login to sign in to Kimi, or /provider to add another provider from a model catalog.',
     );
     return;
   }
+  const managedChatGPT = chatGPTAccountId(host.state.appState.availableProviders[CHATGPT_PROVIDER_NAME]?.oauth?.key) !== undefined;
+  const baseAlias = (alias: string): string => {
+    const model = models[alias];
+    if (!managedChatGPT || model?.provider !== CHATGPT_PROVIDER_NAME || model.serviceTier === undefined) return alias;
+    const base = `${CHATGPT_PROVIDER_NAME}/${model.model}`;
+    return alias === `${base}/${model.serviceTier}` && models[base]?.provider === model.provider && models[base]?.model === model.model
+      ? base
+      : alias;
+  };
+  const pickerModels = Object.fromEntries(Object.entries(models).filter(([alias]) => baseAlias(alias) === alias));
+  const onSelect = (alias: string, thinking: ThinkingEffort, persist: ModelSwitchPersistence): void => {
+    host.restoreEditor();
+    const model = models[alias];
+    const base = model === undefined ? undefined : `${CHATGPT_PROVIDER_NAME}/${model.model}`;
+    if (!managedChatGPT || model?.provider !== CHATGPT_PROVIDER_NAME || model.serviceTier !== undefined || base === undefined) {
+      confirmThenPerformModelSwitch(host, alias, thinking, persist);
+      return;
+    }
+    const options: ChoiceOption[] = [{ value: alias, label: 'Normal' }];
+    for (const tier of CHATGPT_SERVICE_TIERS) {
+      const tierAlias = `${base}/${tier}`;
+      const variant = models[tierAlias];
+      if (variant?.provider === model.provider && variant.model === model.model && variant.serviceTier === tier) {
+        options.push({ value: tierAlias, label: tier === 'priority' ? 'Fast' : 'Ultrafast' });
+      }
+    }
+    if (options.length === 1) {
+      confirmThenPerformModelSwitch(host, alias, thinking, persist);
+      return;
+    }
+    const current = host.state.appState.model;
+    const preferred = options.some(({ value }) => value === selectedValue) ? selectedValue : alias;
+    host.mountEditorReplacement(new ChoicePickerComponent({
+      title: 'Select a service tier',
+      options,
+      currentValue: current,
+      initialValue: preferred,
+      onSelect: (variant) => {
+        host.restoreEditor();
+        confirmThenPerformModelSwitch(host, variant, thinking, persist);
+      },
+      onCancel: () => {
+        host.restoreEditor();
+      },
+    }));
+  };
   host.mountEditorReplacement(
     new TabbedModelSelectorComponent({
-      models,
-      currentValue: host.state.appState.model,
-      selectedValue,
+      models: pickerModels,
+      currentValue: baseAlias(host.state.appState.model),
+      selectedValue: baseAlias(selectedValue),
       currentThinkingEffort: host.state.appState.thinkingEffort,
       warning: hasConversationHistory(host) ? MODEL_SWITCH_CACHE_WARNING : undefined,
       effortDescriptions: effortDescriptions(),
       onSelect: ({ alias, thinking }) => {
-        host.restoreEditor();
-        confirmThenPerformModelSwitch(host, alias, thinking, 'model');
+        onSelect(alias, thinking, 'model');
       },
       onSessionOnlySelect: ({ alias, thinking }) => {
-        host.restoreEditor();
-        confirmThenPerformModelSwitch(host, alias, thinking, 'session');
+        onSelect(alias, thinking, 'session');
       },
       onCancel: () => {
         host.restoreEditor();

@@ -224,6 +224,8 @@ api_key = "sk-xxxxx"
 
 切换账号会更新 ChatGPT 模型列表。后续的 ChatGPT 模型请求会使用所选账号，包括 Kimi 现有会话发出的请求。
 
+在 `/model` 中用左右方向键选择推理强度。选定模型后，可在账号和模型支持的档位中请求 **Normal**、**Fast** 或 **Ultrafast**。OpenAI 可能会使用其他档位处理请求。选中模型时按 `Alt-S`，可将设置应用到当前会话。运行 `/provider refresh chatgpt` 可重新获取可用选项。
+
 ## `google-genai`
 
 用于直连 Google Gemini API。thinking、视觉及多模态能力按模型名自动识别。

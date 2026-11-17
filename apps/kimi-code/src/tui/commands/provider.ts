@@ -64,6 +64,8 @@ async function handleProviderRefresh(
   host: SlashCommandHost,
   providerId: string | undefined,
 ): Promise<void> {
+  const active = host.state.appState.model;
+  const previous = host.state.appState.availableModels[active];
   const spinner = host.showProgressSpinner(
     providerId === undefined
       ? 'Refreshing models for all providers…'
@@ -81,6 +83,9 @@ async function handleProviderRefresh(
   }
   spinner.stop({ ok: true, label: 'Refresh finished.' });
   reportProviderRefresh(host, result);
+  if (previous?.serviceTier !== undefined && host.state.appState.model === active && host.state.appState.availableModels[active] === undefined) {
+    host.showStatus('The current ChatGPT service tier is no longer available. Select a model with /model.', 'warning');
+  }
   if (result.retired_default !== undefined) {
     await host.modelMigration.retire(result.retired_default);
   }

@@ -1,3 +1,4 @@
+import { CHATGPT_SERVICE_TIERS } from '@moonshot-ai/kimi-code-oauth';
 import { parsePattern } from '@moonshot-ai/agent-core-v2/agent/permissionRules/matchesRule';
 import { OpenRouterOptionsSchema } from '@moonshot-ai/agent-core-v2/human/llm/builtin/provider/openrouter/options';
 import { EnvironmentsSectionSchema } from '@moonshot-ai/agent-core-v2/remote/declaration/remoteEnvironmentDeclaration';
@@ -84,6 +85,7 @@ const ModelAliasBaseSchema = z.object({
   defaultEffort: z.string().optional(),
   offEffort: z.string().optional(),
   effortMap: z.record(z.string(), z.string()).optional(),
+  serviceTier: z.enum(CHATGPT_SERVICE_TIERS).optional(),
   betaApi: z.boolean().optional(),
   baseUrl: z.string().optional(),
   upgrade: ModelUpgradeSchema.optional(),
@@ -96,6 +98,7 @@ export const ModelAliasOverrideSchema = ModelAliasBaseSchema.omit({
   betaApi: true,
   baseUrl: true,
   upgrade: true,
+  serviceTier: true,
 }).partial();
 
 export type ModelAliasOverrides = z.infer<typeof ModelAliasOverrideSchema>;

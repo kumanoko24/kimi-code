@@ -5,6 +5,7 @@ import {
   type Session,
   type ThinkingEffort,
 } from '@moonshot-ai/kimi-code-sdk';
+import { CHATGPT_PROVIDER_NAME } from '@moonshot-ai/kimi-code-oauth';
 
 import {
   confirmThenPerformModelSwitch,
@@ -198,6 +199,13 @@ export class AuthFlowController {
   async refreshProviderModels(
     options?: RefreshProviderModelsOptions,
   ): Promise<RefreshProviderModelsResponse> {
+    if (options?.providerId === CHATGPT_PROVIDER_NAME) {
+      const chatGPT = await this.host.harness.auth.refreshChatGPTModelCatalog(true);
+      if (chatGPT !== undefined) {
+        if (chatGPT.changed.length > 0) await this.refreshAvailableModels();
+        return chatGPT;
+      }
+    }
     const result = await this.host.harness.refreshProviderModels(options);
     // The engine persists provider-only config changes (type, baseUrl, …)
     // while reporting the provider as unchanged, so reload even when no model
