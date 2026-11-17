@@ -75,6 +75,7 @@ export interface AppState {
   maxContextTokens: number;
   cumulativeTokens?: number;
   cumulativeCostUsd?: number;
+  openRouterCreditsUsd?: number;
   isCompacting: boolean;
   isReplaying: boolean;
   streamingPhase: 'idle' | 'waiting' | 'thinking' | 'composing' | 'shell';

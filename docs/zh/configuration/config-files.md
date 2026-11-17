@@ -663,7 +663,9 @@ defaultCwd = "/workspace"
 | `[transcript].tool_call_density` | `string` | `compact` | `fullscreen` 模式下的工具调用密度：`compact`、`balanced` 或 `detailed` |
 | `[transcript].thinking` | `string` | `grouped` | `fullscreen` 模式下的思考折叠：`grouped` 或 `ungrouped` |
 | `[status_line].items` | `string[]` | `[]` | 底部状态栏第一行的内置槽位及顺序：`mode`、`goal`、`model`、`tasks`、`cwd`、`git`、`tips`，未知 id 跳过并告警 |
-| `[status_line].command` | `string` | `""` | 自定义状态栏命令：stdout 首行替换状态栏，stdin 收 JSON 快照；上限 300ms、每秒一次，失败回退内置布局 |
+| `[status_line].command` | `string` | `""` | 自定义命令通过 stdin 接收 JSON 快照，stdout 的第一行替换状态栏第一行。每次运行上限为 1,000 毫秒，每秒最多运行一次。内置布局作为回退。 |
+
+当前模型直连 OpenRouter 且 OpenRouter 返回余额时，状态栏第二行显示账户剩余的美元额度。Kimi Code CLI 在切换模型、模型的账户设置变更或每轮结束后刷新余额。
 
 <details>
 <summary>command 的 stdin 输入</summary>

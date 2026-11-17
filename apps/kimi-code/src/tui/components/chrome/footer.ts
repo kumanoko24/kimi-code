@@ -43,6 +43,7 @@ import {
 export type ToolOutputExpandHint = 'expand' | 'collapse';
 
 const DEFAULT_STATUS_LINE_ITEMS = ['mode', 'goal', 'model', 'tasks', 'environment', 'cwd', 'git'] as const;
+const usdBalanceFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
 const MAX_CWD_SEGMENTS = 3;
 const MAX_ENVIRONMENT_REASON_WIDTH = 40;
@@ -422,12 +423,21 @@ export class FooterComponent implements Component {
       state.cumulativeCostUsd === undefined
         ? ''
         : ` · ${formatUsdCost(state.cumulativeCostUsd)}`;
-    const contextText =
+    const contextAndCost =
       formatContextStatus(state.contextUsage, state.contextTokens, state.maxContextTokens) +
       costText;
+    const creditText = state.openRouterCreditsUsd === undefined
+      ? ''
+      : ` · OR credit ${usdBalanceFormatter.format(state.openRouterCreditsUsd)}`;
+    const hint = this.transientHint ?? this.warningHint;
+    const shortcut = !hint && customLine !== null ? this.expandShortcut() : null;
+    const leftText = shortcut ?? hint ?? '';
+    const leftWidth = leftText === '' ? 0 : visibleWidth(leftText) + 1;
+    const contextText = leftWidth + visibleWidth(contextAndCost + creditText) <= width
+      ? contextAndCost + creditText
+      : contextAndCost;
     const contextWidth = visibleWidth(contextText);
     let line2: string;
-    const hint = this.transientHint ?? this.warningHint;
     if (hint) {
       const maxHintWidth = Math.max(0, width - contextWidth - 1);
       const shownHint =
@@ -441,7 +451,6 @@ export class FooterComponent implements Component {
     } else {
       // A status_line.command owns line 1 outright, so the ctrl+o hint moves
       // down here; the transient and warning hints above take precedence.
-      const shortcut = customLine !== null ? this.expandShortcut() : null;
       const left =
         shortcut !== null && visibleWidth(shortcut) + 1 + contextWidth <= width
           ? chalk.hex(colors.textDim)(shortcut)

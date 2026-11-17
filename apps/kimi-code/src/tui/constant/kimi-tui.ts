@@ -8,6 +8,7 @@ export const CTRL_D_HINT = 'Press Ctrl+D again to exit';
 export const CTRL_C_HINT = 'Press Ctrl+C again to exit';
 export const SHUTTING_DOWN_HINT = 'Shutting down… (running shutdown hooks)';
 export const MAIN_AGENT_ID = 'main';
+export const OPENROUTER_CREDITS_URL = 'https://openrouter.ai/api/v1/credits';
 export const OAUTH_LOGIN_REQUIRED_STARTUP_NOTICE = 'OAuth login expired. Send /login to login.';
 export const TUI_MODE_RESTART_NOTICE = 'TUI mode takes effect after restarting Kimi Code.';
 export const SESSIONLESS_STARTUP_NOTICE =

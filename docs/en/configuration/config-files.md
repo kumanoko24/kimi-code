@@ -664,7 +664,9 @@ Alongside `config.toml`, the CLI keeps terminal-UI and client preferences in a c
 | `[transcript].tool_call_density` | `string` | `compact` | Tool call density in `fullscreen` mode: `compact`, `balanced`, or `detailed` |
 | `[transcript].thinking` | `string` | `grouped` | Thinking folding in `fullscreen` mode: `grouped` or `ungrouped` |
 | `[status_line].items` | `string[]` | `[]` | Built-in slots on the first footer line and their order: `mode`, `goal`, `model`, `tasks`, `cwd`, `git`, `tips`; unknown ids are skipped with a warning |
-| `[status_line].command` | `string` | `""` | Custom status line command: its first stdout line replaces the footer, and a JSON snapshot is passed on stdin; capped at 300ms, throttled to once per second, failures fall back to the built-in layout |
+| `[status_line].command` | `string` | `""` | A custom command receives a JSON snapshot on stdin. Its first stdout line replaces the first footer line. Each run is capped at 1,000 ms, with at most one run per second. The built-in layout is the fallback. |
+
+When the active model connects directly to OpenRouter, the second footer line shows the account's remaining USD credit if OpenRouter returns a balance. Kimi Code CLI refreshes the balance when the model or its account settings change and after each turn.
 
 <details>
 <summary>Fields in the stdin JSON snapshot</summary>

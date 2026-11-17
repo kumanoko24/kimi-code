@@ -137,6 +137,7 @@ import { CHROME_GUTTER, DETACH_HINT_TEXT, DOCK_APPROVAL_ROWS } from './constant/
 import { MAX_TERMINAL_TITLE_LENGTH } from './constant/terminal';
 import { AuthFlowController } from './controllers/auth-flow';
 import { BtwPanelController } from './controllers/btw-panel';
+import { fetchOpenRouterCredits, openRouterCreditsApiKey } from './utils/openrouter-credits';
 import { ClipboardImageHintController } from './controllers/clipboard-image-hint';
 import { EditorKeyboardController } from './controllers/editor-keyboard';
 import { ModelMigrationController } from './controllers/model-migration';
@@ -387,7 +388,7 @@ export class KimiTUI {
   private readonly approvalController = new ApprovalController();
   private readonly questionController = new QuestionController();
   private readonly reverseRpcDisposers: Array<() => void> = [];
-  private surveySettingSubscription: Unsubscribe | undefined;
+  private configSectionSubscription: Unsubscribe | undefined;
   private skillCommands: readonly KimiSlashCommand[] = [];
   readonly skillCommandMap = new Map<string, string>();
   private readonly skillCommandDefaultPaths = new Map<string, string>();
@@ -416,6 +417,7 @@ export class KimiTUI {
   private signalCleanupHandlers: Array<() => void> = [];
   private isShuttingDown = false;
   private backgroundRefreshPromise: Promise<void> | undefined;
+  private openRouterCreditsRequest: AbortController | undefined;
   private readonly migrationPlan: MigrationPlan | null;
   private readonly migrateOnly: boolean;
   private readonly telemetryDisabled: boolean;
@@ -586,9 +588,13 @@ export class KimiTUI {
         },
       }),
     );
-    this.surveySettingSubscription = this.harness.onConfigSectionChanged((change) => {
-      if (change.domain !== 'disableFeedbackSurvey') return;
-      this.setAppState({ disableFeedbackSurvey: change.value === true ? true : undefined });
+    this.configSectionSubscription = this.harness.onConfigSectionChanged((change) => {
+      if (change.domain === 'disableFeedbackSurvey') {
+        this.setAppState({ disableFeedbackSurvey: change.value === true ? true : undefined });
+      } else if (['models', 'providers', 'defaultProvider'].includes(change.domain)) {
+        this.setAppState({ openRouterCreditsUsd: undefined });
+        this.refreshOpenRouterCredits();
+      }
     });
     this.streamingUI = new StreamingUIController(this);
     this.state.transcriptContainer.setTimeline(this.streamingUI.timeline);
@@ -1335,6 +1341,7 @@ export class KimiTUI {
     this.isShuttingDown = true;
     this.unregisterSignalHandlers();
     this.aborted = true;
+    this.openRouterCreditsRequest?.abort();
     // A Ctrl+C during shutdown means "don't wait for slow hooks": skip the
     // remaining graceful close and get out immediately. Captured at the UI
     // input-listener level so it works no matter which component holds focus
@@ -1366,8 +1373,8 @@ export class KimiTUI {
     this.disposeTranscriptChildren();
     this.editorKeyboard.dispose();
     this.surveyController.dispose();
-    this.surveySettingSubscription?.();
-    this.surveySettingSubscription = undefined;
+    this.configSectionSubscription?.();
+    this.configSectionSubscription = undefined;
     this.state.footer.dispose();
     this.disposeEditorReplacement();
     for (const dispose of this.reverseRpcDisposers) {
@@ -2391,7 +2398,28 @@ export class KimiTUI {
     this.surveyController.notifyTurnEnded(event.requestId);
     this.programStatus.finishTurn(event);
     this.state.footer.refreshGitStatus();
+    this.refreshOpenRouterCredits();
     if (event.reason === 'completed') void this.maybeAutoGenerateSessionTitle();
+  }
+
+  private refreshOpenRouterCredits(): void {
+    this.openRouterCreditsRequest?.abort();
+    this.openRouterCreditsRequest = undefined;
+    const alias = this.state.appState.model;
+    if (!alias || this.aborted) return;
+
+    const request = new AbortController();
+    this.openRouterCreditsRequest = request;
+    void this.harness.getConfig()
+      .then((config) => {
+        if (request.signal.aborted) return undefined;
+        const key = openRouterCreditsApiKey(config, alias);
+        return key === undefined ? undefined : fetchOpenRouterCredits(key, request.signal);
+      })
+      .catch(() => undefined)
+      .then((openRouterCreditsUsd) => {
+        if (!request.signal.aborted) this.setAppState({ openRouterCreditsUsd });
+      });
   }
 
   private async maybeAutoGenerateSessionTitle(): Promise<void> {
@@ -3235,7 +3263,12 @@ export class KimiTUI {
       'additionalDirs' in patch &&
       !sameStringArrays(this.state.appState.additionalDirs, patch.additionalDirs ?? []);
     const busyChanged = 'streamingPhase' in patch || 'isCompacting' in patch;
+    const modelChanged = 'model' in patch && patch.model !== this.state.appState.model;
     Object.assign(this.state.appState, patch);
+    if (modelChanged) {
+      this.state.appState.openRouterCreditsUsd = undefined;
+      this.refreshOpenRouterCredits();
+    }
     if ('planMode' in patch) this.updateEditorBorderHighlight();
     this.state.footer.setState(this.state.appState);
     this.updateActivityPane();
