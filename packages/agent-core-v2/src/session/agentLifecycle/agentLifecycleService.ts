@@ -282,7 +282,13 @@ export class AgentLifecycleService extends Disposable implements IAgentLifecycle
         accessor: {
           get: (id) => container.invokeFunction((accessor) => accessor.get(id)),
         },
-        dispose: () => loop.close().then(() => container.disposeAsync()),
+        dispose: async () => {
+          try {
+            await loop.close();
+          } finally {
+            await container.disposeAsync();
+          }
+        },
       };
       this.rosterAdopt(scopeHandle);
       managed = this.roster.get(agentId);
