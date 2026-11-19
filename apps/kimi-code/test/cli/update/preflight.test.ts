@@ -203,8 +203,10 @@ function tuiConfig(overrides: Partial<TuiConfig> = {}): TuiConfig {
   };
 }
 
-function disableAutoInstall(): void {
-  mocks.loadTuiConfig.mockResolvedValue(tuiConfig({ upgrade: { autoInstall: false } }));
+function disableAutoInstallDuringPreflight(): void {
+  mocks.loadTuiConfig
+    .mockResolvedValueOnce(tuiConfig())
+    .mockResolvedValue(tuiConfig({ upgrade: { autoInstall: false } }));
 }
 
 function captureOutput(): {
@@ -267,7 +269,7 @@ describe('runUpdatePreflight', () => {
     resetKimiRegionCache();
     mocks.readUpdateInstallState.mockResolvedValue(emptyUpdateInstallState());
     mocks.writeUpdateInstallState.mockResolvedValue(undefined);
-    mocks.loadTuiConfig.mockResolvedValue(tuiConfig());
+    mocks.loadTuiConfig.mockReset().mockResolvedValue(tuiConfig());
     mocks.resolveUpdateDeviceId.mockReturnValue('test-device');
     mocks.detectInstallSource.mockResolvedValue('unsupported');
     mocks.appendRolloutDecisionLog.mockResolvedValue(undefined);
@@ -327,18 +329,14 @@ describe('runUpdatePreflight', () => {
     );
   });
 
-  it('does not start a fresh-check background install when automatic updates are disabled', async () => {
-    disableAutoInstall();
-    mocks.readUpdateCache.mockResolvedValue(emptyUpdateCache());
-    mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
-    mocks.detectInstallSource.mockResolvedValue('npm-global');
+  it('skips passive version checks when automatic updates are disabled', async () => {
+    mocks.loadTuiConfig.mockResolvedValue(tuiConfig({ upgrade: { autoInstall: false } }));
     const { options } = captureOutput();
 
     await expect(runUpdatePreflight('0.4.0', options)).resolves.toBe('continue');
-    await flushBackgroundInstall();
 
-    expect(refreshUpdateCache).toHaveBeenCalledTimes(1);
-    expect(detectInstallSource).toHaveBeenCalledTimes(1);
+    expect(refreshUpdateCache).not.toHaveBeenCalled();
+    expect(detectInstallSource).not.toHaveBeenCalled();
     expect(promptForInstallChoice).not.toHaveBeenCalled();
     expect(mocks.spawn).not.toHaveBeenCalled();
   });
@@ -371,8 +369,8 @@ describe('runUpdatePreflight', () => {
     expect(mocks.spawn).not.toHaveBeenCalled();
   });
 
-  it('npm-global: prompts and spawns npm install -g when automatic updates are disabled', async () => {
-    disableAutoInstall();
+  it('npm-global: prompts and spawns npm install -g when background updates are disabled during preflight', async () => {
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('npm-global');
@@ -396,7 +394,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('refreshes a stale cached target before showing the foreground install prompt', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.6.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.7.0'));
     mocks.detectInstallSource.mockResolvedValue('npm-global');
@@ -424,7 +422,7 @@ describe('runUpdatePreflight', () => {
   it('falls back to the cached foreground prompt target when the refresh hangs', async () => {
     vi.useFakeTimers();
     try {
-      disableAutoInstall();
+      disableAutoInstallDuringPreflight();
       mocks.readUpdateCache.mockResolvedValue(cacheWith('0.6.0'));
       mocks.refreshUpdateCache.mockReturnValue(new Promise(() => {}));
       mocks.detectInstallSource.mockResolvedValue('npm-global');
@@ -447,7 +445,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('pnpm-global: spawns pnpm add -g', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('pnpm-global');
@@ -463,7 +461,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('pnpm-global on win32: spawns pnpm.cmd through a shell', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('pnpm-global');
@@ -485,7 +483,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('yarn-global: spawns yarn global add', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('yarn-global');
@@ -501,7 +499,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('bun-global: spawns bun add -g', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('bun-global');
@@ -530,7 +528,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('native: self-spawns the staged downloader sub-command', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('native');
@@ -553,7 +551,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('native on win32: auto-installs via the staged downloader sub-command', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('native');
@@ -610,7 +608,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('declined install continues without spawn', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('npm-global');
@@ -621,7 +619,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('warns and continues when spawn exits non-zero, without claiming success', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('npm-global');
@@ -634,7 +632,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('spawns the resolved absolute path instead of the bare command name', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('npm-global');
@@ -654,7 +652,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('warns and continues without spawning when the package manager cannot be resolved', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('npm-global');
@@ -843,23 +841,15 @@ describe('runUpdatePreflight', () => {
     }));
   });
 
-  it('defaults to automatic background updates when client preferences cannot be loaded', async () => {
+  it('skips passive version checks when client preferences cannot be loaded', async () => {
     mocks.loadTuiConfig.mockRejectedValue(new Error('broken tui.toml'));
-    mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
-    mocks.readUpdateInstallState.mockResolvedValue(installState());
-    mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
-    mocks.detectInstallSource.mockResolvedValue('npm-global');
-    mockSpawnExit(0);
     const { options } = captureOutput();
 
     await expect(runUpdatePreflight('0.4.0', options)).resolves.toBe('continue');
 
+    expect(refreshUpdateCache).not.toHaveBeenCalled();
     expect(promptForInstallChoice).not.toHaveBeenCalled();
-    expect(mocks.spawn).toHaveBeenCalledWith(
-      expect.stringMatching(/^npm(\.cmd)?$/),
-      ['install', '-g', '@moonshot-ai/kimi-code@0.5.0'],
-      { detached: true, stdio: 'ignore' },
-    );
+    expect(mocks.spawn).not.toHaveBeenCalled();
   });
 
   it('starts only one background update when two sessions preflight concurrently', async () => {
@@ -1051,7 +1041,7 @@ describe('runUpdatePreflight', () => {
   });
 
   it('tracks update_prompted telemetry', async () => {
-    disableAutoInstall();
+    disableAutoInstallDuringPreflight();
     mocks.readUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.refreshUpdateCache.mockResolvedValue(cacheWith('0.5.0'));
     mocks.detectInstallSource.mockResolvedValue('npm-global');
@@ -1128,8 +1118,8 @@ describe('runUpdatePreflight', () => {
       }));
     });
 
-    it('prompts with rollout telemetry when eligible and auto-install is disabled', async () => {
-      disableAutoInstall();
+    it('prompts with rollout telemetry when eligible and auto-install is disabled during preflight', async () => {
+      disableAutoInstallDuringPreflight();
       const released = cacheWithManifest(releasedForEveryone('0.5.0'));
       mocks.readUpdateCache.mockResolvedValue(released);
       mocks.refreshUpdateCache.mockResolvedValue(released);
@@ -1152,7 +1142,7 @@ describe('runUpdatePreflight', () => {
     });
 
     it('uses the refreshed manifest for rollout telemetry when the prompt target changes', async () => {
-      disableAutoInstall();
+      disableAutoInstallDuringPreflight();
       const cached = cacheWithManifest(manifestFor('0.6.0', {
         publishedAt: '2020-01-01T00:00:00.000Z',
         rollout: [{ percent: 100, delaySeconds: 0 }],
@@ -1210,7 +1200,7 @@ describe('runUpdatePreflight', () => {
     });
 
     it('stays silent when the user-visible refresh reveals a held newer version', async () => {
-      disableAutoInstall();
+      disableAutoInstallDuringPreflight();
       mocks.readUpdateCache.mockResolvedValue(cacheWithManifest(releasedForEveryone('0.6.0')));
       mocks.refreshUpdateCache.mockResolvedValue(cacheWithManifest(heldForEveryone('0.7.0')));
       mocks.detectInstallSource.mockResolvedValue('npm-global');
@@ -1265,7 +1255,7 @@ describe('runUpdatePreflight', () => {
     });
 
     it('treats any plan older than 24h as fully rolled out', async () => {
-      disableAutoInstall();
+      disableAutoInstallDuringPreflight();
       const staleRollout = manifestFor('0.5.0', {
         publishedAt: new Date(Date.now() - 25 * 3_600 * 1_000).toISOString(),
         rollout: [

@@ -509,7 +509,7 @@ export async function shouldAutoInstallUpdates(): Promise<boolean> {
     const config = await loadTuiConfig();
     return config.upgrade.autoInstall;
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -763,7 +763,7 @@ export async function runUpdatePreflight(
   const logger = options.logger ?? log;
   const platform = process.platform;
 
-  if (isAutoUpdateDisabledByEnv()) return 'continue';
+  if (isAutoUpdateDisabledByEnv() || !(await shouldAutoInstallUpdates())) return 'continue';
 
   try {
     const isInteractive = options.isTTY ?? (process.stdin.isTTY && process.stdout.isTTY);

@@ -665,7 +665,7 @@ Alongside `config.toml`, the CLI keeps terminal-UI and client preferences in a c
 | `[editor].command` | `string` | `""` | External editor command for composing long input; empty falls back to `$VISUAL` / `$EDITOR` |
 | `[notifications].enabled` | `boolean` | `true` | Whether desktop notifications are sent |
 | `[notifications].notification_condition` | `string` | `unfocused` | When to notify: `unfocused` (only when the terminal is not focused) or `always` |
-| `[upgrade].auto_install` | `boolean` | `true` | Whether new versions are installed automatically |
+| `[upgrade].auto_install` | `boolean` | `false` | Enable routine version checks and automatic installations |
 | `[transcript].tool_call_density` | `string` | `compact` | Tool call density in `fullscreen` mode: `compact`, `balanced`, or `detailed` |
 | `[transcript].thinking` | `string` | `grouped` | Thinking folding in `fullscreen` mode: `grouped` or `ungrouped` |
 | `[status_line].items` | `string[]` | `[]` | Built-in slots on the first footer line and their order: `mode`, `goal`, `model`, `tasks`, `cwd`, `git`, `tips`; unknown ids are skipped with a warning |
@@ -699,7 +699,7 @@ enabled = true
 notification_condition = "unfocused" # "unfocused" | "always"
 
 [upgrade]
-auto_install = true
+auto_install = false
 
 [transcript] # fullscreen mode only
 tool_call_density = "compact" # "compact" | "balanced" | "detailed"

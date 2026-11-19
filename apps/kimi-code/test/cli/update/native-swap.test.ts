@@ -181,6 +181,8 @@ describe('maybeRelaunchWithStagedNativeUpdate', () => {
     exePath = join(workDir, 'bin', 'kimi');
     await mkdir(join(workDir, 'bin'), { recursive: true });
     await writeFile(exePath, 'old-binary');
+    await mkdir(homeDir);
+    await writeFile(join(homeDir, 'tui.toml'), '[upgrade]\nauto_install = true\n');
     vi.stubEnv('KIMI_CODE_HOME', homeDir);
     fsMocks.renameBlocker = null;
     fsMocks.linkError = null;

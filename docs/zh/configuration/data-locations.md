@@ -63,7 +63,7 @@ $KIMI_CODE_HOME  （默认 ~/.kimi-code）
 数据根下的顶层文件各有用途，大部分由 CLI 自动管理：
 
 - **`config.toml`**：主运行时配置，存放供应商、模型、循环控制等用户级设置。详见[配置文件](./config-files.md)。
-- **`tui.toml`**：终端界面客户端偏好，包括自动更新开关 `[upgrade].auto_install`（默认开启）。可在 `/settings` 关闭，或手动设为 `auto_install = false`。
+- **`tui.toml`**：终端界面客户端偏好。常规版本检查和自动更新默认关闭。可在 `/settings` 开启，或将 `[upgrade].auto_install` 设为 `true`。
 - **`AGENTS.md`**：全局 Kimi 专属 Agent 指令。该文件会随 `KIMI_CODE_HOME` 移动；跨工具通用指令仍可放在 `~/.agents/AGENTS.md`。
 - **`mcp.json`**：用户级 MCP server 声明，启动时与项目内的 `.kimi-code/mcp.json` 合并加载。详见 [MCP](../customization/mcp.md)。
 - **`skills/`**：Kimi 专属用户级 Skills。该目录会随 `KIMI_CODE_HOME` 移动；跨工具通用 Skills 仍可放在 `~/.agents/skills/`。详见 [Agent Skills](../customization/skills.md)。

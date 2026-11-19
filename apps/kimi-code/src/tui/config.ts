@@ -286,7 +286,7 @@ export const DEFAULT_NOTIFICATIONS_CONFIG: NotificationsConfig = {
 };
 
 export const DEFAULT_UPGRADE_PREFERENCES: UpgradePreferences = {
-  autoInstall: true,
+  autoInstall: false,
 };
 
 export const DEFAULT_TUI_CONFIG: TuiConfig = TuiConfigSchema.parse({

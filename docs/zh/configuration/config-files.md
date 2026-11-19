@@ -664,7 +664,7 @@ defaultCwd = "/workspace"
 | `[editor].command` | `string` | `""` | 编写长输入用的外部编辑器命令；留空则回退到 `$VISUAL` / `$EDITOR` |
 | `[notifications].enabled` | `boolean` | `true` | 是否发送桌面通知 |
 | `[notifications].notification_condition` | `string` | `unfocused` | 何时通知：`unfocused`（仅终端失去焦点时）或 `always`（总是） |
-| `[upgrade].auto_install` | `boolean` | `true` | 是否自动安装新版本 |
+| `[upgrade].auto_install` | `boolean` | `false` | 是否启用常规版本检查和自动安装 |
 | `[transcript].tool_call_density` | `string` | `compact` | `fullscreen` 模式下的工具调用密度：`compact`、`balanced` 或 `detailed` |
 | `[transcript].thinking` | `string` | `grouped` | `fullscreen` 模式下的思考折叠：`grouped` 或 `ungrouped` |
 | `[status_line].items` | `string[]` | `[]` | 底部状态栏第一行的内置槽位及顺序：`mode`、`goal`、`model`、`tasks`、`cwd`、`git`、`tips`，未知 id 跳过并告警 |
@@ -698,7 +698,7 @@ enabled = true
 notification_condition = "unfocused" # "unfocused" | "always"
 
 [upgrade]
-auto_install = true
+auto_install = false
 
 [transcript] # 仅 fullscreen 模式生效
 tool_call_density = "compact" # "compact" | "balanced" | "detailed"
