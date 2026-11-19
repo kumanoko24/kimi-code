@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { defineConfig } from 'tsdown';
 
 import { rawTextPlugin } from '../../build/raw-text-plugin.mjs';
+import { resolveBuildCommit } from './scripts/build-commit.mjs';
 import { BUILT_IN_CATALOG_DEFINE, builtInCatalogDefine } from './scripts/built-in-catalog.mjs';
 
 const appRoot = import.meta.dirname;
@@ -47,7 +48,7 @@ export default defineConfig({
     [BUILT_IN_CATALOG_DEFINE]: builtInCatalogDefine(),
     __KIMI_CODE_VERSION__: JSON.stringify(packageJson.version),
     __KIMI_CODE_CHANNEL__: JSON.stringify(process.env['KIMI_CODE_CHANNEL'] ?? ''),
-    __KIMI_CODE_COMMIT__: JSON.stringify(process.env['KIMI_CODE_COMMIT'] ?? ''),
+    __KIMI_CODE_COMMIT__: JSON.stringify(await resolveBuildCommit()),
     __KIMI_CODE_BUILD_TARGET__: JSON.stringify(buildTarget()),
     __KIMI_CODE_NATIVE_BUNDLE__: 'true',
   },

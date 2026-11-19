@@ -3,6 +3,7 @@ import { truncateToWidth, visibleWidth } from '@moonshot-ai/pi-tui';
 import chalk from 'chalk';
 import { effectiveModelAlias } from '@moonshot-ai/kimi-code-sdk';
 
+import { KIMI_BUILD_INFO } from '#/cli/build-info';
 import { ALL_TIPS, TRANSCRIPT_GROUPING_TIP, type ToolbarTip } from '#/tui/constant/tips';
 import { transcriptGroupingActive } from '#/tui/config';
 import { isRainbowDancing, renderDanceFooterModel } from '#/tui/easter-eggs/dance';
@@ -35,6 +36,8 @@ export type ToolOutputExpandHint = 'expand' | 'collapse';
 
 const DEFAULT_STATUS_LINE_ITEMS = ['mode', 'goal', 'model', 'tasks', 'environment', 'cwd', 'git'] as const;
 const usdBalanceFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const buildCommitPrefix = /^([a-f0-9]{8})[a-f0-9]*$/i.exec(KIMI_BUILD_INFO.commit ?? '')?.[1];
+const buildText = buildCommitPrefix === undefined ? '' : ` · build ${buildCommitPrefix}`;
 
 const MAX_CWD_SEGMENTS = 3;
 const MAX_ENVIRONMENT_REASON_WIDTH = 40;
@@ -345,9 +348,12 @@ export class FooterComponent implements Component {
     const shortcut = !hint && customLine !== null ? this.expandShortcut() : null;
     const leftText = shortcut ?? hint ?? '';
     const leftWidth = leftText === '' ? 0 : visibleWidth(leftText) + 1;
-    const contextText = leftWidth + visibleWidth(contextAndCost + creditText) <= width
+    const contextAndCredit = leftWidth + visibleWidth(contextAndCost + creditText) <= width
       ? contextAndCost + creditText
       : contextAndCost;
+    const contextText = leftWidth + visibleWidth(contextAndCredit + buildText) <= width
+      ? contextAndCredit + buildText
+      : contextAndCredit;
     const contextWidth = visibleWidth(contextText);
     let line2: string;
     if (hint) {
