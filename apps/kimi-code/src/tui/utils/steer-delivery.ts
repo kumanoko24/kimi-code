@@ -86,9 +86,6 @@ export function isPeerOrigin(origin: unknown): boolean {
   return metadata.some((entry) => entry !== null && typeof entry === 'object' && 'peer' in entry);
 }
 
-// A shorter pending steer must not match inside a different message.
-// Skill activation text is prepended and ends at `</skill-loaded>`, so the
-// submitted user text is also a suffix immediately after `>`.
 function boundaryIndex(eventText: string, batchText: string): number {
   if (batchText.length === 0) return -1;
   if (eventText === batchText) return 0;

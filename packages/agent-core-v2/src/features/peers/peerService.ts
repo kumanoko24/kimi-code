@@ -8,7 +8,7 @@ import { watch, type FSWatcher } from 'chokidar';
 import { toDisposable } from '#/_base/di/lifecycle';
 import { Service } from '#/_base/di/service';
 import { abortable } from '#/_base/utils/abort';
-import { IAgentLoopService, type LoopNotifyEntry } from '#/agent/loop/loop';
+import { IAgentLoopService } from '#/agent/loop/loop';
 import type { ApprovalResponse } from '#/agent/interaction/approval';
 import { IAgentLifecycleService, MAIN_AGENT_ID } from '#/session/agentLifecycle/agentLifecycle';
 import { IAgentPermissionModeService } from '#/agent/permissionMode/permissionMode';
@@ -28,7 +28,7 @@ import {
 } from '#/human/interaction/interaction';
 import { ISessionContext } from '#/session/sessionContext/sessionContext';
 import { ISessionMetadata } from '#/session/sessionMetadata/sessionMetadata';
-import type { UserPromptOrigin } from '#human/agent/origin';
+import type { UserPromptOrigin } from '@moonshot-ai/core/llm/origin';
 
 import { PEERS_SECTION, type PeersConfig } from './configSection';
 import {
@@ -314,14 +314,11 @@ export class PeerService extends Service implements IPeerService {
       kind: 'user',
       clientMetadata: [{ peer: { ...message.from }, messageId: message.id }],
     };
-    const entry: LoopNotifyEntry = {
-      message: {
-        role: 'user',
-        content: [{ type: 'text', text: peerMessageText(message) }],
-      },
-      meta: { origin },
-    };
-    loop.sendNow(entry);
+    loop.sendNow({
+      role: 'user',
+      content: [{ type: 'text', text: peerMessageText(message) }],
+      attributes: { origin },
+    });
     return true;
   }
 

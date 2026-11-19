@@ -50,7 +50,7 @@
 - `description`：后台任务描述，`run_in_background=true` 时必填
 - `disable_timeout`：后台任务是否取消超时限制
 
-前台模式会阻塞当前轮次，直到命令结束或超时；命令运行期间，TUI 会把 stdout 和 stderr 流式显示在正在运行的 `Bash` 工具卡片中。前台命令超时后默认不会被终止，而是转为后台任务继续运行（受 600 秒默认后台超时约束）；如需恢复超时即终止的行为，将 `[background]` 的 [`bash_auto_background_on_timeout`](../configuration/config-files.md#background) 设为 `false`。600 秒的默认后台超时可通过 [`bash_task_timeout_s`](../configuration/config-files.md#background) 配置（`0` = 无超时），且在 print 模式（`kimi -p`）下默认无超时。后台模式立即返回任务 ID，任务结束时自动通知 Agent。stdin 始终被关闭，交互式命令会立即收到 EOF。任务被停止或后台超时时采用两阶段终止策略（SIGTERM → 5 秒宽限期 → SIGKILL），确保进程可靠结束。Windows 平台默认使用 Git Bash。
+前台模式会阻塞当前轮次，直到命令结束或超时；命令运行期间，TUI 会把 stdout 和 stderr 流式显示在正在运行的 `Bash` 工具卡片中。前台命令超时后默认不会被终止，而是转为后台任务继续运行（受 600 秒默认后台超时约束）；如需恢复超时即终止的行为，将 `[background]` 的 [`bash_auto_background_on_timeout`](../configuration/config-files.md#background) 设为 `false`。600 秒的默认后台超时可通过 [`bash_task_timeout_s`](../configuration/config-files.md#background) 配置（`0` = 无超时），且在 print 模式（`kimi -p`）下默认无超时。后台模式立即返回任务 ID，任务结束时自动通知 Agent。每次执行都会在子进程环境中注入当前会话的 `KIMI_CODE_SESSION_ID` 与所属工作区的 `KIMI_CODE_WORKSPACE_ID`。stdin 始终被关闭，交互式命令会立即收到 EOF。任务被停止或后台超时时采用两阶段终止策略（SIGTERM → 5 秒宽限期 → SIGKILL），确保进程可靠结束。Windows 平台默认使用 Git Bash。
 
 ## 网络类
 
@@ -116,7 +116,7 @@ args = ["acp"]
 
 **`ListAgents`** 和 **`SendMessage`** 让同一台机器上的 live kimi session 交换纯文本消息。`ListAgents` 返回每个 session 的名称、session ID、工作目录，以及它是否就是当前 session。`SendMessage` 接受 `to`（名称或 session ID）和 `message`。接收方看到的文字来自另一个 kimi session，而不是来自你；它不能用来批准权限、修改配置或运行斜杠命令。消息以 steer 方式送达：正在执行 turn 时会中断当前 turn，idle 时会经通知通道开启 turn，而不是排进一般 prompt 队列。消息只在本机传递，共享同一个 `KIMI_CODE_HOME`，不携带对话历史或文件。默认入站策略是 `hold`：接收 session 会先询问再注入，完全自动模式则直接接受。可用 `[peers] inbound = "accept" | "hold" | "refuse"` 配置；其他非交互 session 会拒绝 hold 的消息。会话的自定义标题（`/title`）会作为 peer 名称；没有自定义标题时，名称是 `<prefix>-<short session id>`，其中 `[peers] name` 设置前缀（默认使用 cwd 的 basename）。用 `[peers] max_message_chars` 设置长度上限（默认 100000）。只有 main agent 会提供这两个工具；swarm 或 tower mode 开启时工具会隐藏，进站消息会延后到 mode 结束才处理。该功能默认关闭；设置 `KIMI_CODE_EXPERIMENTAL_CROSS_SESSION=1` 或 `[experimental] cross_session = true` 开启。
 
-**`AskUserQuestion`** 以结构化多选题的形式向用户提问，适用于需要消歧或选择方案的场景。`questions` 参数接受 1–4 道题，每道题需提供 `question`（以 `?` 结尾）、`options`（2–4 个选项，每项含 `label` 和 `description`）以及可选的 `header`（最多 12 字符）和 `multi_select`（默认 false）。系统自动附加"其他"选项。在 Kimi Code for VS Code 中，包含多道题的提问支持 Back 导航，并在题目之间切换时保留已选择或自定义的答案。`background` 为 true 时启动后台问题任务并立即返回任务 ID；问题在本轮结束后仍保持待答，用户作答后答案会以通知形式直接送回 Agent。宿主未实现交互式提问能力时返回失败提示，Agent 应改为在文本回复中直接提问。
+**`AskUserQuestion`** 以结构化多选题的形式向用户提问，适用于需要消歧或选择方案的场景。`questions` 参数接受 1–4 道题，每道题需提供 `question`（以 `?` 结尾）、`options`（2–4 个选项，每项含 `label` 和 `description`）以及可选的 `header`（最多 12 字符）和 `multi_select`（默认 false）。系统自动附加 "其他" 选项。在 Kimi Code for VS Code 中，包含多道题的提问支持 Back 导航，并在题目之间切换时保留已选择或自定义的答案。`background` 为 true 时启动后台问题任务并立即返回任务 ID；问题在本轮结束后仍保持待答，用户作答后答案会以通知形式直接送回 Agent。宿主未实现交互式提问能力时返回失败提示，Agent 应改为在文本回复中直接提问。
 
 **`NotifyUser`** 让 main agent 和 subagent 在不结束本轮的情况下发布进展更新。每条更新包含 `title`（可选，一行简短标题，在空间有限的地方单独显示）和 `message`（用轻量 Markdown 写的详细内容）。只有工具成功返回并确认已展示后，更新才会显示；失败、中断或被关闭开关抑制的调用不会显示，对话中的工具调用记录会保留实际展示结果。重要发现仍须写入最终回复或 subagent 的最终汇报。
 

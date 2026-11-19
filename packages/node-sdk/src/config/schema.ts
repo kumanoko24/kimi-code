@@ -1,6 +1,6 @@
 import { CHATGPT_SERVICE_TIERS } from '@moonshot-ai/kimi-code-oauth';
 import { parsePattern } from '@moonshot-ai/agent-core-v2/agent/permissionRules/matchesRule';
-import { OpenRouterOptionsSchema } from '@moonshot-ai/agent-core-v2/human/llm/builtin/provider/openrouter/options';
+import { OpenRouterOptionsSchema } from '@moonshot-ai/agent-core-v2/llm-adapter/provider/openrouterOptions';
 import { EnvironmentsSectionSchema } from '@moonshot-ai/agent-core-v2/remote/declaration/remoteEnvironmentDeclaration';
 import { z } from 'zod';
 
@@ -32,6 +32,7 @@ export const ProviderTypeSchema = z.enum([
   'kimi',
   'google-genai',
   'openai_responses',
+  'bedrock',
   'vertexai',
 ]);
 

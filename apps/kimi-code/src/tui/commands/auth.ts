@@ -32,10 +32,6 @@ import {
 } from './prompts';
 import type { SlashCommandHost } from './dispatch';
 
-// ---------------------------------------------------------------------------
-// Auth: login / logout
-// ---------------------------------------------------------------------------
-
 export async function handleLoginCommand(host: SlashCommandHost): Promise<void> {
   const releaseAuthBlock = host.beginAuthBlock();
   try {
@@ -109,9 +105,6 @@ async function handleKimiCodeOAuthLogin(
   };
   host.cancelInFlight = cancelLogin;
   try {
-    // The facade maps region → profile hosts (env overrides keep priority);
-    // 'mainland-cn' is passed explicitly too so switching back overrides a
-    // persisted global login.
     await host.harness.auth.login(DEFAULT_OAUTH_PROVIDER_NAME, {
       signal: controller.signal,
       region,

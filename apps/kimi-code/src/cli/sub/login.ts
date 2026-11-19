@@ -1,11 +1,3 @@
-/**
- * `kimi login` — drive the OAuth device-code flow non-interactively.
- * The `authMethods.terminal-auth.args=['login']` (legacy `_meta` path)
- * advertised by the ACP server points clients at this entry point. The
- * first-class ACP `args=['--login']` path enters the same flow via
- * `kimi acp --login`.
- */
-
 import { CHATGPT_PROVIDER_NAME, CHATGPT_SIGN_IN_FLAG } from '@moonshot-ai/kimi-code-oauth';
 import { createKimiHarness } from '@moonshot-ai/kimi-code-sdk';
 import { Option, type Command } from 'commander';

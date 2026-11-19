@@ -1,7 +1,7 @@
 import { CHATGPT_SERVICE_TIERS } from '@moonshot-ai/kimi-code-oauth';
 import { z } from 'zod';
 
-import { OpenRouterOptionsSchema } from '#human/llm/builtin/provider/openrouter/options';
+import { OpenRouterOptionsSchema } from '#/llm-adapter/provider/openrouterOptions';
 
 import {
   type ConfigDiagnostic,

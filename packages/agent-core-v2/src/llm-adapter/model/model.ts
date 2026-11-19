@@ -21,7 +21,7 @@ export interface ModelOverride {
   capabilities?: string[];
   displayName?: string;
   reasoningKey?: string;
-  openrouter?: import('#human/llm/builtin/provider/openrouter/options').OpenRouterOptions;
+  openrouter?: import('@moonshot-ai/core/llm/builtin/provider/openrouter/options').OpenRouterOptions;
   adaptiveThinking?: boolean;
   supportEfforts?: string[];
   defaultEffort?: string;
@@ -49,7 +49,7 @@ export interface ModelRecord {
   capabilities?: string[];
   displayName?: string;
   reasoningKey?: string;
-  openrouter?: import('#human/llm/builtin/provider/openrouter/options').OpenRouterOptions;
+  openrouter?: import('@moonshot-ai/core/llm/builtin/provider/openrouter/options').OpenRouterOptions;
   adaptiveThinking?: boolean;
   betaApi?: boolean;
   supportEfforts?: string[];
