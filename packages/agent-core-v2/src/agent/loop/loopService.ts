@@ -1366,18 +1366,20 @@ export class AgentLoopService extends Disposable implements IAgentLoopService {
     }
   }
 
-  private hasPendingRequests(): boolean {
+  private hasPendingRequests(options?: { readonly ignoreHeldInbox: boolean }): boolean {
     if (this.disposing) return false;
+    const state = this.loop?.state;
+    const inbox = options?.ignoreHeldInbox === true && state?.held === true ? undefined : state?.inbox;
     return (
       this.pendingSubmissions.length > 0 ||
       this.pendingNotifications.length > 0 ||
       this.pendingReminders.length > 0 ||
-      (this.loop?.state.inbox.normal.length ?? 0) > 0 ||
-      (this.loop?.state.inbox.notify.length ?? 0) > 0 ||
-      (this.loop?.state.inbox.remind.length ?? 0) > 0 ||
-      (this.loop?.state.completionPending ?? false) ||
-      (this.loop?.state.resetting ?? false) ||
-      (this.loop !== undefined && this.loop.state.status !== 'idle')
+      (inbox?.normal.length ?? 0) > 0 ||
+      (inbox?.notify.length ?? 0) > 0 ||
+      (inbox?.remind.length ?? 0) > 0 ||
+      (state?.completionPending ?? false) ||
+      (state?.resetting ?? false) ||
+      (state !== undefined && state.status !== 'idle')
     );
   }
 
@@ -1408,9 +1410,13 @@ export class AgentLoopService extends Disposable implements IAgentLoopService {
     return this.loop?.state.calls.some((call) => call.detached) ?? false;
   }
 
+  private isLifecycleDrained(): boolean {
+    return !this.disposing && this.quiescenceDepth === 0 && !this.hasPendingRequests({ ignoreHeldInbox: true });
+  }
+
   private maybeSettle(): void {
     const generation = ++this.settlementGeneration;
-    const drained = !this.disposing && this.quiescenceDepth === 0 && !this.hasPendingRequests();
+    const drained = this.isLifecycleDrained();
     const idle = drained && !this.hasActiveBackgroundTasks();
     if (!drained && this.lifecycleDrained) this.macroGeneration += 1;
     if (!drained) this.lifecycleDrained = false;
@@ -1418,16 +1424,13 @@ export class AgentLoopService extends Disposable implements IAgentLoopService {
     if (drained && (!this.lifecycleDrained || !this.lifecycleIdle)) {
       void this.turns.drain().then(() => {
         if (generation !== this.settlementGeneration) return;
-        const currentDrained = !this.disposing && this.quiescenceDepth === 0 && !this.hasPendingRequests();
-        if (currentDrained && !this.lifecycleDrained) {
+        if (this.isLifecycleDrained() && !this.lifecycleDrained) {
           this.lifecycleDrained = true;
           this.events.publish(new LoopDrained({ agentId: this.scopeContext.agentId, generation: this.macroGeneration }));
         }
         if (generation !== this.settlementGeneration) return;
         const currentIdle =
-          !this.disposing &&
-          this.quiescenceDepth === 0 &&
-          !this.hasPendingRequests() &&
+          this.isLifecycleDrained() &&
           !this.hasActiveBackgroundTasks() &&
           this.lifecycleDrained;
         if (currentIdle && !this.lifecycleIdle) {
