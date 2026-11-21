@@ -206,7 +206,7 @@ export class AcpWorkerService extends Service implements IAcpWorkerService {
       stderr = new StderrTail(proc.stderr, STDERR_TAIL_MAX_CHARS);
 
       const id = `acp_${randomUUID().slice(0, 8)}`;
-      let worker: Worker | undefined;
+      const worker: { current?: Worker } = {};
       const lifetime = new AbortController();
       const session = await abortable(
         openAcpSession({
@@ -215,23 +215,23 @@ export class AcpWorkerService extends Service implements IAcpWorkerService {
           model: options.config.model,
           effort: options.config.effort,
           requestPermission: (request) =>
-            worker === undefined
+            worker.current === undefined
               ? Promise.resolve(selectPermissionOption(request.options, 'reject'))
-              : this.requestPermission(worker, request),
+              : this.requestPermission(worker.current, request),
           onText: (text) => {
-            const turn = worker?.current;
+            const turn = worker.current?.current;
             if (turn === undefined) return;
             turn.text += text;
             turn.listeners.onText?.(text);
           },
           onToolCall: (call) => {
-            const turn = worker?.current;
+            const turn = worker.current?.current;
             if (turn === undefined) return;
             turn.tools.set(call.id, call);
             turn.listeners.onActivity?.({ tools: [...turn.tools.values()], plan: turn.plan });
           },
           onPlan: (entries) => {
-            const turn = worker?.current;
+            const turn = worker.current?.current;
             if (turn === undefined) return;
             turn.plan = entries;
             turn.listeners.onActivity?.({ tools: [...turn.tools.values()], plan: turn.plan });
@@ -255,7 +255,7 @@ export class AcpWorkerService extends Service implements IAcpWorkerService {
         turns: 0,
         interaction: options.interaction,
       };
-      worker = created;
+      worker.current = created;
       session.closed.then(
         () => {
           created.sessionClosed = true;

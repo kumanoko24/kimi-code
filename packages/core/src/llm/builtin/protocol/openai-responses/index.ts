@@ -81,7 +81,7 @@ export const openAIResponsesProtocol = defineProtocol<
   decodeError: (error, source) => {
     if (error instanceof APIError) {
       const mapped = chatGPTPlanError(error.code ?? null, error.message, {
-        statusCode: error.status,
+        statusCode: typeof error.status === 'number' ? error.status : undefined,
         requestId: error.requestID ?? null,
         headers: headersToRecord(error.headers) ?? null,
         retryAfterMs: null,

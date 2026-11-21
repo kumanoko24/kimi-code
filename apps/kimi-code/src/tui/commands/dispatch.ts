@@ -168,10 +168,6 @@ export interface SlashCommandHost {
   stop(exitCode?: number): Promise<void>;
   setExitOpenUrl(url: string): void;
   setExitForegroundTask(task: (exitCode: number) => Promise<void>): void;
-  /**
-   * Relaunch the CLI with the latest installed binary after the TUI has shut
-   * down, resuming `sessionId` when set. Used by `/restart`.
-   */
   setExitRestart(sessionId: string | undefined): void;
   showHelpPanel(): void;
   createNewSession(): Promise<void>;

@@ -94,7 +94,7 @@ export class KimiAuthFacade {
     });
   }
 
-  async status(providerName?: string | undefined): Promise<AuthStatus> {
+  async status(providerName?: string): Promise<AuthStatus> {
     const accountId = providerName === CHATGPT_PROVIDER_NAME ? this.activeChatGPTAccount() : undefined;
     if (accountId !== undefined) {
       return {
@@ -202,7 +202,7 @@ export class KimiAuthFacade {
     };
   }
 
-  async logout(providerName?: string | undefined): Promise<KimiAuthLogoutResult> {
+  async logout(providerName?: string): Promise<KimiAuthLogoutResult> {
     if (providerName === CHATGPT_PROVIDER_NAME && this.activeChatGPTAccount() !== undefined) {
       return this.logoutChatGPT();
     }
@@ -234,7 +234,7 @@ export class KimiAuthFacade {
     return { providerName, ok: true, revocationConfirmed };
   }
 
-  async getManagedUsage(providerName?: string | undefined): Promise<AuthManagedUsageResult> {
+  async getManagedUsage(providerName?: string): Promise<AuthManagedUsageResult> {
     const auth = this.resolveRuntimeManagedAuth(providerName);
     return this.toolkit.getManagedUsage(providerName, {
       oauthRef: auth.oauthRef,
@@ -288,7 +288,7 @@ export class KimiAuthFacade {
     return chatGPTAccountId(this.resolveManagedAuth(CHATGPT_PROVIDER_NAME).oauthRef?.key);
   }
 
-  private resolveRuntimeManagedAuth(providerName?: string | undefined): {
+  private resolveRuntimeManagedAuth(providerName?: string): {
     readonly oauthRef: OAuthRef;
     readonly baseUrl?: string | undefined;
   } {

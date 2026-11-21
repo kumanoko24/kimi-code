@@ -219,8 +219,6 @@ export async function runShell(
     for (const dir of opts.skillsDirs) args.push('--skills-dir', dir);
     const script = process.argv[1];
     const useScript = !detectNativeInstall() && script !== undefined;
-    // Replace the process image so the new TUI inherits the terminal without
-    // this process lingering as a parent (which would keep its locks open).
     if (process.platform !== 'win32') {
       try {
         process.execve?.(
